@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'symbolic_math_bridge'
-  s.version          = '1.0.13'
+  s.version          = '1.0.14'
   s.summary          = 'A bridge for the complete symbolic math stack.'
   s.description      = 'This plugin provides C-wrapped access to SymEngine and math libraries.'
   s.homepage         = 'https://example.com'
@@ -14,13 +14,22 @@ Pod::Spec.new do |s|
   s.static_framework = true
   s.swift_version = '5.0'
 
-  # Simple configuration - let CocoaPods handle XCFramework linking automatically
+  # CRITICAL: Force all library symbols to be linked and available for dlsym()
+  # The SymEngineBridge.m +load method will reference all symbols to ensure linking
   s.pod_target_xcconfig = {
-    'OTHER_LDFLAGS' => '-lc++ -lsymengine_wrapper',
-    'LIBRARY_SEARCH_PATHS' => '$(inherited)'
+    'OTHER_LDFLAGS' => [
+      '-lc++',
+      '-lsymengine_wrapper',
+      # Force load to ensure symbols survive linking and are available at runtime
+      '-all_load'
+    ].join(' '),
+    'LIBRARY_SEARCH_PATHS' => '$(inherited)',
+    # Ensure symbols aren't stripped during optimization
+    'STRIP_STYLE' => 'debugging',
+    'DEAD_CODE_STRIPPING' => 'NO'
   }
 
-  # All XCFrameworks treated identically - no special handling for SymEngine
+  # All XCFrameworks - these contain the actual library implementations
   s.vendored_frameworks = [
     'GMP.xcframework',
     'MPFR.xcframework', 
