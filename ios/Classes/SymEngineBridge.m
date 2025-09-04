@@ -6,20 +6,12 @@
 
 #import <Foundation/Foundation.h>
 
-// symbolic_math_bridge/ios/Classes/SymEngineBridge.m
-//
-//  SymEngineBridge.m
-//  Forces the linker to include SymEngine wrapper symbols + all math library symbols
-//
-
-#import <Foundation/Foundation.h>
-
-// Declare the external C functions from our static library (SymEngine wrapper)
-extern char* symengine_evaluate(const char* expression);
-extern char* symengine_solve(const char* expression, const char* symbol);
-extern char* symengine_factor(const char* expression);
-extern char* symengine_expand(const char* expression);
-extern void symengine_free_string(char* str);
+// Declare the external C functions from our static library (using the flutter_ prefix)
+extern char* flutter_symengine_evaluate(const char* expression);
+extern char* flutter_symengine_solve(const char* expression, const char* symbol);
+extern char* flutter_symengine_factor(const char* expression);
+extern char* flutter_symengine_expand(const char* expression);
+extern void flutter_symengine_free_string(char* str);
 
 // Declare external functions from GMP (only the ones we know exist and work)
 extern void __gmpz_init(void* x);
@@ -86,12 +78,12 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
 + (void)load {
     // Create references to ensure symbols are linked and available for dlsym()
     static void* refs[] = {
-        // === SymEngine C Wrapper Symbols ===
-        symengine_evaluate,
-        symengine_solve,
-        symengine_factor,
-        symengine_expand,
-        symengine_free_string,
+        // === SymEngine C Wrapper Symbols (Corrected) ===
+        flutter_symengine_evaluate,
+        flutter_symengine_solve,
+        flutter_symengine_factor,
+        flutter_symengine_expand,
+        flutter_symengine_free_string,
         
         // === GMP Core Symbols (only ones we know work) ===
         (void *)__gmpz_init,

@@ -19,11 +19,13 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     'OTHER_LDFLAGS' => [
       '-lc++',
-      '-lsymengine_wrapper',
+      '-lsymengine_flutter_wrapper',  # Updated to match the actual library name
       # Force load to ensure symbols survive linking and are available at runtime
       '-all_load'
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',
+    # 'HEADER_SEARCH_PATHS' => '$(inherited) $(PODS_TARGET_SRCROOT)/Headers',
+
     # Ensure symbols aren't stripped during optimization
     'STRIP_STYLE' => 'debugging',
     'DEAD_CODE_STRIPPING' => 'NO'
@@ -32,9 +34,9 @@ Pod::Spec.new do |s|
   # All XCFrameworks - these contain the actual library implementations
   s.vendored_frameworks = [
     'GMP.xcframework',
-    'MPFR.xcframework', 
+    'MPFR.xcframework',
     'MPC.xcframework',
     'FLINT.xcframework',
-    'SymEngineWrapper.xcframework'
+    'SymEngineFlutterWrapper.xcframework'  # Use the properly built Flutter wrapper
   ]
 end

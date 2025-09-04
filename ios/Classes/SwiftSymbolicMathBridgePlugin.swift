@@ -40,14 +40,14 @@ public class SwiftSymbolicMathBridgePlugin: NSObject, FlutterPlugin {
         let mpfrSymbol = dlsym(handle, "mpfr_init2")
         let mpcSymbol = dlsym(handle, "mpc_init2") 
         let flintSymbol = dlsym(handle, "fmpz_init")
-        let symengineSymbol = dlsym(handle, "symengine_evaluate")
+        let symengineSymbol = dlsym(handle, "flutter_symengine_evaluate") // Corrected symbol name
         
         var symbolStatus: [String: Bool] = [:]
         symbolStatus["gmp_init_set_str"] = (gmpSymbol != nil)
         symbolStatus["mpfr_init2"] = (mpfrSymbol != nil)
         symbolStatus["mpc_init2"] = (mpcSymbol != nil)
         symbolStatus["fmpz_init"] = (flintSymbol != nil) 
-        symbolStatus["symengine_evaluate"] = (symengineSymbol != nil)
+        symbolStatus["flutter_symengine_evaluate"] = (symengineSymbol != nil) // Corrected key
         
         print("[SYMBOLIC_MATH] Symbol availability test:")
         for (symbol, available) in symbolStatus {
