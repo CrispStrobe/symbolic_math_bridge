@@ -1,7 +1,7 @@
 #!/bin/bash
 # copy_xcframeworks.sh
 # Simple script to copy finished XCFrameworks from math-stack-ios-builder
-# NO COMPILATION - just copying finished products
+# and ensure a clean state in the target directory.
 
 set -e
 
@@ -51,10 +51,18 @@ verifyFramework() {
     fi
 }
 
-# Main execution
+# --- Main Execution ---
 logMsg "Copying all XCFrameworks from math-stack-ios-builder..."
 
 checkSourceDirectory
+
+# **NEW:** Clean up the old, separate Headers directory to avoid conflicts.
+# The correct headers are now located inside each XCFramework.
+if [ -d "$TARGET_DIR/Headers" ]; then
+    logMsg "Cleaning up stale external Headers directory..."
+    rm -rf "$TARGET_DIR/Headers"
+    logMsg "✅ Stale headers removed."
+fi
 
 # Copy all base mathematical frameworks
 copyXCFramework "GMP"
@@ -76,6 +84,5 @@ verifyFramework "SymEngineFlutterWrapper"
 
 logMsg ""
 logMsg "Next steps:"
-logMsg "1. Update your cas_bridge.dart to use flutter_symengine_* function names"
-logMsg "2. Test with flutter run"
-logMsg "3. Your plugin is ready to use!"
+logMsg "1. Run 'flutter clean' in your test app."
+logMsg "2. Run 'flutter run' - the build should now succeed!"
