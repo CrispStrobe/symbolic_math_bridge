@@ -31,6 +31,12 @@ Pod::Spec.new do |s|
     'OTHER_LDFLAGS' => [
       '-lc++',
       '-lsymengine_flutter_wrapper',
+      '-all_load',
+      # Belt-and-braces: in addition to `-all_load` on the big archive,
+      # explicitly force-load the wrapper-only archive. The big-archive
+      # path keeps debug builds working (45 symbols land in
+      # crisp_calc.debug.dylib); the wrapper-only path is the seed for
+      # the release-build fix when the upstream link pipeline cooperates.
       '-Wl,-force_load,${PODS_TARGET_SRCROOT}/FlutterSymEngineWrapperOnly.xcframework/macos-arm64_x86_64/libflutter_symengine_wrapper_only.a',
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',

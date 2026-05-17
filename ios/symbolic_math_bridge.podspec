@@ -27,6 +27,7 @@ Pod::Spec.new do |s|
     'OTHER_LDFLAGS' => [
       '-lc++',
       '-lsymengine_flutter_wrapper',
+      '-all_load',
       '-Wl,-force_load,${PODS_TARGET_SRCROOT}/FlutterSymEngineWrapperOnly.xcframework/ios-arm64/libflutter_symengine_wrapper_only.a',
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',
