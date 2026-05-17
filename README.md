@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS-lightgrey)](https://flutter.dev)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
 
-A comprehensive Flutter plugin providing unified access to the mathematical computing stack for iOS and macOS. This plugin integrates **GMP, MPFR, MPC, FLINT, and SymEngine** libraries, offering both high-level symbolic computation and direct low-level mathematical operations.
+A comprehensive Flutter plugin providing unified `dart:ffi` access to a powerful mathematical computing stack for iOS and macOS. This plugin integrates **GMP, MPFR, MPC, FLINT, and SymEngine** libraries, offering both high-level symbolic computation and direct, low-level access to each library's core functions.
 
 ## Features
 
@@ -39,49 +39,111 @@ A comprehensive Flutter plugin providing unified access to the mathematical comp
 - Matrix operations over exact rings
 - Optimized algorithms for number theory
 
+### 🔗 **Type-Safe FFI**
+- Clean, type-safe Dart API that abstracts away C interoperability complexities
+- Automatic memory management for most operations
+- Matrix algebra with determinant and inversion operations
+
 ## Quick Start
+
+### Installation
 
 Add this to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
   symbolic_math_bridge:
-    path: ../symbolic_math_bridge  # Adjust path as needed
+    path: ../symbolic_math_bridge
+  ffi: ^2.0.1 # Required for FFI
 ```
 
-Then use it in your Dart code:
+### Basic Usage
 
 ```dart
 import 'package:symbolic_math_bridge/symbolic_math_bridge.dart';
 
 void main() {
-  final casBridge = CasBridge();
+  final bridge = SymbolicMathBridge();
   
   // High-level symbolic computing
-  print(casBridge.evaluate('2 + 3*4'));                    // → 14
-  print(casBridge.solve('x^2 - 4', 'x'));                  // → 2, -2
-  print(casBridge.expand('(x + 1)^2'));                    // → 1 + 2*x + x^2
-  print(casBridge.factor('x^2 - 1'));                      // → (-1 + x)*(1 + x)
+  print('Evaluate: ${bridge.evaluate("2 + 3*4")}');            // → 14
+  print('Solve: ${bridge.solve("x^2 - 4", "x")}');              // → [-2, 2]
+  print('Expand: ${bridge.expand("(x + 1)^2")}');              // → 1 + 2*x + x^2
+  print('Differentiate: ${bridge.differentiate("sin(x)", "x")}'); // → cos(x)
+  print('Log: ${bridge.callUnary("log", "E")}');              // → 1
   
-  // Direct arbitrary-precision arithmetic
-  print(casBridge.testGMPDirect(256));                     // → 2^256 (78 digits)
-  print(casBridge.testMPFRDirect());                       // → High-precision π
-  print(casBridge.testMPCDirect());                        // → Complex: (3+4i)×(1+2i)
-  print(casBridge.testFLINTDirect());                      // → 20! = 2432902008176640000
+  // Matrix operations
+  final matrix = bridge.createMatrix(2, 2);
+  matrix.set(0, 0, "4");
+  matrix.set(0, 1, "7");
+  matrix.set(1, 0, "2");
+  matrix.set(1, 1, "6");
+  print('Matrix Determinant: ${matrix.getDeterminant()}');      // → 10
+  matrix.dispose(); // Important: free the native memory
+  
+  // Direct library testing
+  print('GMP: ${bridge.testGMPDirect(256)}');                  // → 2^256 (78 digits)
+  print('MPFR: ${bridge.testMPFRDirect()}');                   // → High-precision π
+  print('MPC: ${bridge.testMPCDirect()}');                     // → Complex: (3+4i)×(1+2i)
+  print('FLINT: ${bridge.testFLINTDirect()}');                 // → 20! = 2432902008176640000
 }
 ```
 
+## API Reference
+
+The primary class is `SymbolicMathBridge`, which provides a singleton instance for all mathematical operations.
+
+### Core Symbolic Operations
+
+- `String evaluate(String expression)` - Evaluate mathematical expressions
+- `String expand(String expression)` - Expand algebraic expressions
+- `String solve(String expression, String symbol)` - Solve equations for a symbol
+- `String differentiate(String expression, String symbol)` - Symbolic differentiation
+- `String substitute(String expr, String sym, String val)` - Substitute values in expressions
+
+### Unary Mathematical Functions
+
+- `String callUnary(String funcName, String expression)`
+
+Available function names: `abs`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`, `exp`, `log`, `sqrt`, `gamma`
+
+### Number Theory Functions
+
+- `String gcd(String a, String b)` - Greatest common divisor
+- `String lcm(String a, String b)` - Least common multiple
+- `String factorial(int n)` - Factorial calculation
+- `String fibonacci(int n)` - Fibonacci number calculation
+
+### Matrix Operations
+
+- `SymEngineMatrix createMatrix(int rows, int cols)` - Create a new matrix
+- `matrix.set(int row, int col, String value)` - Set matrix element
+- `String matrix.get(int row, int col)` - Get matrix element
+- `String matrix.getDeterminant()` - Calculate matrix determinant
+- `SymEngineMatrix matrix.inverse()` - Calculate matrix inverse
+- `matrix.dispose()` - **Crucial for preventing memory leaks**
+
+### Direct Library Access
+
+For maximum performance and direct access to library functions:
+
+- `String testGMPDirect(int exponent)` - GMP: Calculate 2^exponent
+- `String testMPFRDirect()` - MPFR: High-precision π calculation
+- `String testMPCDirect()` - MPC: Complex arithmetic example
+- `String testFLINTDirect()` - FLINT: Factorial calculation
+
+### Library Status and Diagnostics
+
+- `Map<String, bool> getLibraryStatus()` - Check which libraries are available
+- `Map<String, List<String>> getTestResults()` - Get comprehensive test results
+
 ## Architecture
 
-This plugin circumvents the problem of integrating multiple interdependent C/C++ mathematical libraries into a Flutter application. Our solution uses a simple approach to prevent symbol stripping and ensure all library functions are available at runtime.
+This plugin uses a robust FFI architecture to bridge the gap between Dart and the native C/C++ libraries, solving the complex problem of integrating multiple interdependent mathematical libraries into a Flutter application.
 
 ### The Symbol Linking Challenge
 
-When Flutter apps use native C libraries via FFI, the iOS linker often strips "unused" symbols from the final binary to save space. However, these symbols are actually used at runtime by Dart's FFI, causing "symbol not found" errors.
-
-### Our Solution: Forced Symbol Loading
-
-The plugin includes a `SymEngineBridge.m` file that explicitly references 40+ core functions from all mathematical libraries:
+When Flutter apps use native C libraries via FFI, the iOS linker often strips "unused" symbols from the final binary to save space. However, these symbols are actually used at runtime by Dart's FFI, causing "symbol not found" errors. Our solution applies forced symbol loading: The plugin includes a `SymEngineBridge.m` file that explicitly references over 100 core functions from all five mathematical libraries:
 
 ```objc
 // Forces the linker to preserve all symbols
@@ -107,87 +169,56 @@ This approach ensures all symbols remain available for Dart FFI lookup via `dlsy
 
 ### Plugin Configuration
 
-The `symbolic_math_bridge.podspec` uses several key settings:
+The `symbolic_math_bridge.podspec` is configured to correctly integrate the native libraries:
 
 ```ruby
-# Prevent symbol stripping
-s.pod_target_xcconfig = {
-  'OTHER_LDFLAGS' => '-lc++ -lsymengine_wrapper -all_load',
-  'STRIP_STYLE' => 'debugging',
-  'DEAD_CODE_STRIPPING' => 'NO'
-}
-
-# Include all mathematical libraries as XCFrameworks
+# The podspec references the single, combined wrapper
 s.vendored_frameworks = [
   'GMP.xcframework',
   'MPFR.xcframework', 
   'MPC.xcframework',
   'FLINT.xcframework',
-  'SymEngineWrapper.xcframework'
+  'SymEngineFlutterWrapper.xcframework'
 ]
-```
 
-## API Reference
-
-### CasBridge Class
-
-The main class providing access to all mathematical libraries:
-
-```dart
-class CasBridge {
-  // SymEngine high-level operations
-  String evaluate(String expression);
-  String solve(String expression, String symbol);
-  String factor(String expression);
-  String expand(String expression);
-  
-  // Direct library access for maximum performance
-  String testGMPDirect(int exponent);      // GMP: 2^exponent
-  String testMPFRDirect();                 // MPFR: high-precision π
-  String testMPCDirect();                  // MPC: complex arithmetic
-  String testFLINTDirect();                // FLINT: factorial calculation
-  
-  // Status and diagnostics
-  Map<String, bool> getLibraryStatus();
-  Map<String, List<String>> getTestResults();
+# Linker flags to prevent dead code stripping
+s.pod_target_xcconfig = {
+  'OTHER_LDFLAGS' => '-all_load',
+  'STRIP_STYLE' => 'debugging',
+  'DEAD_CODE_STRIPPING' => 'NO'
 }
 ```
 
-### Library Status
+## Building the Native Libraries from Source
 
-Check which libraries are available:
+This plugin requires pre-built `.xcframework` files for the underlying C/C++ libraries. These are generated using the companion [math-stack-ios-builder](https://github.com/CrispStrobe/math-stack-ios-builder) repository. The streamlined build process handles everything from compilation to verification.
 
-```dart
-final status = casBridge.getLibraryStatus();
-// Returns: {
-//   'SymEngine Wrapper': true,
-//   'GMP Direct': true,
-//   'MPFR Direct': true,
-//   'MPC Direct': true,
-//   'FLINT Direct': true
-// }
-```
-
-## Building from Source
-
-This plugin requires pre-built XCFrameworks. Build them using the companion repository:
+### 1. Clone the Builder Repository
 
 ```bash
-# Clone and build the mathematical libraries
 git clone https://github.com/CrispStrobe/math-stack-ios-builder.git
 cd math-stack-ios-builder
-
-# Download source archives (gmp-6.3.0.tar.bz2, mpfr-4.2.2.tar.xz, etc.)
-# Build in dependency order
-./build_gmp.sh
-./build_mpfr.sh  
-./build_mpc.sh
-./build_flint.sh
-./build_symengine.sh
-
-# Copy to plugin
-./copy_symengine_wrapper.sh
 ```
+
+### 2. Download Source Archives
+
+Ensure the required tarballs (e.g., `gmp-6.3.0.tar.bz2`, `mpfr-4.2.2.tar.xz`, etc.) are present in the directory.
+
+### 3. Run the Master Build Script
+
+This single command compiles all libraries in the correct order, patches them for CocoaPods compatibility, and verifies the final artifacts:
+
+```bash
+# Make all build scripts executable
+chmod +x build_*.sh
+
+# Run the master script
+./build_all.sh
+```
+
+### 4. Automated Verification & Copy
+
+After a successful build, the script will automatically verify the integrity of all generated `.xcframework` files. It will then prompt you to copy the new frameworks directly into the `symbolic_math_bridge` plugin directory, completing the workflow.
 
 ## Platform Support
 
@@ -210,36 +241,21 @@ cd math-stack-ios-builder
 
 ```dart
 // High-level symbolic computing
-casBridge.evaluate('solve(x^2 + 2*x + 1, x)')  // → -1
+bridge.evaluate('2 + 3*4')                    // → 14
+bridge.solve('x^2 - 4', 'x')                  // → [-2, 2]
+bridge.expand('(x + 1)^2')                    // → 1 + 2*x + x^2
+bridge.differentiate('sin(x)', 'x')           // → cos(x)
 
-// Arbitrary precision (GMP): 2^256  
-// → 115792089237316195423570985008687907853269984665640564039457584007913129639936
-
-// High precision π (MPFR, 256 bits)
-// → 3.1415926535897932384626433832795028841971693993751058209749445923
-
-// Complex arithmetic (MPC): (3+4i) × (1+2i)
-// → (-5.0000000000000000e+00 1.0000000000000000e+01)
-
-// Number theory (FLINT): 20!
-// → 2432902008176640000
+// Number theory
+bridge.gcd('48', '18')                        // → 6
+bridge.fibonacci(10)                          // → 55
 ```
-
-## Contributing
-
-This plugin is part of a larger mathematical computing ecosystem. Contributions are welcome, particularly for:
-
-- Android support
-- Additional SymEngine wrapper functions  
-- More direct library function bindings
-- Performance optimizations
-- Documentation improvements
 
 ## Related Projects
 
-- **[math-stack-ios-builder](https://github.com/CrispStrobe/math-stack-ios-builder)**: Build system for the native libraries
-- **[math-stack-test](https://github.com/CrispStrobe/math-stack-test)**: Comprehensive demo application
+- **[math-stack-ios-builder](https://github.com/CrispStrobe/math-stack-ios-builder)**: Build system for generating the native `.xcframework` libraries
+- **[math-stack-test](https://github.com/CrispStrobe/math-stack-test)**: Comprehensive demo application showcasing the plugin's full functionality
 
 ## License
 
-This plugin is released under the **MIT License**. The underlying mathematical libraries (GMP, MPFR, MPC, FLINT, SymEngine) have their own licenses (LGPL, GPL, BSD) which you must comply with in your application.
+This plugin is released under the **MIT License**. The underlying mathematical libraries (GMP, MPFR, MPC, FLINT, SymEngine) have their own licenses (especially LGPL), which you must comply with in your application.

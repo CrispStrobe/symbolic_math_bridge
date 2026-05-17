@@ -2,23 +2,56 @@ import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 
-// --- C Function Signatures (Native) ---
-// These typedefs use dart:ffi types (Int32, Pointer, etc.) to match the C source code exactly.
+// ============================================================================
+// EXCEPTION CLASSES
+// ============================================================================
 
-// Core
+class SymbolicMathException implements Exception {
+  final String operation;
+  final String message;
+  final String? library;
+  
+  SymbolicMathException(this.operation, this.message, [this.library]);
+  
+  @override
+  String toString() {
+    final libPrefix = library != null ? '[$library] ' : '';
+    return 'SymbolicMathException: ${libPrefix}$operation - $message';
+  }
+}
+
+class SymbolicMathParseException extends SymbolicMathException {
+  SymbolicMathParseException(String operation, String message, [String? library]) 
+      : super(operation, message, library);
+}
+
+class SymbolicMathMemoryException extends SymbolicMathException {
+  SymbolicMathMemoryException(String operation, [String? library]) 
+      : super(operation, 'Memory allocation failed', library);
+}
+
+class SymbolicMathNotAvailableException extends SymbolicMathException {
+  SymbolicMathNotAvailableException(String library) 
+      : super('initialize', 'Library not available: $library', library);
+}
+
+// ============================================================================
+// C FUNCTION SIGNATURES - FLUTTER SYMENGINE WRAPPER
+// ============================================================================
+
+// Core symbolic operations
 typedef _EvaluateC = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _SolveC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
 typedef _SubstituteC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
 typedef _FreeStringC = Void Function(Pointer<Utf8>);
-// Unary
 typedef _UnaryFuncC = Pointer<Utf8> Function(Pointer<Utf8>);
-// Number Theory
-typedef _GcdLcmC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
+typedef _BinaryFuncC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
+typedef _GetConstantC = Pointer<Utf8> Function();
+typedef _GetVersionC = Pointer<Utf8> Function();
 typedef _FactorialC = Pointer<Utf8> Function(Int32);
 typedef _FibonacciC = Pointer<Utf8> Function(Int32);
-// Constants
-typedef _GetConstantC = Pointer<Utf8> Function();
-// Matrix
+
+// Matrix operations
 typedef _MatrixNewC = Pointer<Void> Function(Int32, Int32);
 typedef _MatrixFreeC = Void Function(Pointer<Void>);
 typedef _MatrixSetElementC = Int32 Function(Pointer<Void>, Int32, Int32, Pointer<Utf8>);
@@ -28,23 +61,21 @@ typedef _MatrixUnaryOpC = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpReturnsMatrixC = Pointer<Void> Function(Pointer<Void>);
 typedef _MatrixBinaryOpC = Pointer<Void> Function(Pointer<Void>, Pointer<Void>);
 
-// --- Dart Function Signatures (Dart-side) ---
-// These typedefs use standard Dart types (int, String, etc.) for the public API.
+// ============================================================================
+// DART FUNCTION SIGNATURES - FLUTTER SYMENGINE WRAPPER
+// ============================================================================
 
-// Core
 typedef _EvaluateDart = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _SolveDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
 typedef _SubstituteDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
-// Unary
 typedef _UnaryFuncDart = Pointer<Utf8> Function(Pointer<Utf8>);
-// Number Theory
-typedef _GcdLcmDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
+typedef _BinaryFuncDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
+typedef _GetConstantDart = Pointer<Utf8> Function();
+typedef _GetVersionDart = Pointer<Utf8> Function();
 typedef _FactorialDart = Pointer<Utf8> Function(int);
 typedef _FibonacciDart = Pointer<Utf8> Function(int);
-// Constants
-typedef _GetConstantDart = Pointer<Utf8> Function();
-// Matrix
+
 typedef _MatrixNewDart = Pointer<Void> Function(int, int);
 typedef _MatrixFreeDart = void Function(Pointer<Void>);
 typedef _MatrixSetElementDart = int Function(Pointer<Void>, int, int, Pointer<Utf8>);
@@ -54,6 +85,146 @@ typedef _MatrixUnaryOpDart = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpReturnsMatrixDart = Pointer<Void> Function(Pointer<Void>);
 typedef _MatrixBinaryOpDart = Pointer<Void> Function(Pointer<Void>, Pointer<Void>);
 
+// ============================================================================
+// MATRIX FINALIZER
+// ============================================================================
+
+late final NativeFinalizer _matrixFinalizer;
+
+// ============================================================================
+// MATRIX CLASS
+// ============================================================================
+
+class SymEngineMatrix implements Finalizable {
+  late final Pointer<Void> _ptr;
+  final SymbolicMathBridge _bridge;
+  final int _rows;
+  final int _cols;
+  bool _disposed = false;
+
+  SymEngineMatrix._fromPointer(this._ptr, this._bridge, this._rows, this._cols) {
+    _matrixFinalizer.attach(this, _ptr, detach: this);
+  }
+
+  // Add the missing getters that the main.dart expects
+  int get rows => _rows;
+  int get cols => _cols;
+
+  void _checkDisposed() {
+    if (_disposed) {
+      throw SymbolicMathException('matrix_operation', 'Matrix has been disposed');
+    }
+  }
+
+  void dispose() {
+    if (!_disposed) {
+      _matrixFinalizer.detach(this);
+      _bridge._matrixFree(_ptr);
+      _disposed = true;
+    }
+  }
+
+  void set(int row, int col, String value) {
+    _checkDisposed();
+    if (value.trim().isEmpty) {
+      throw SymbolicMathParseException('matrix_set', 'Value cannot be empty');
+    }
+    
+    final valueC = value.toNativeUtf8();
+    try {
+      final result = _bridge._matrixSetElement(_ptr, row, col, valueC);
+      if (result != 0) {
+        throw SymbolicMathException('matrix_set', 'Failed to set element at ($row, $col). Error code: $result');
+      }
+    } finally {
+      malloc.free(valueC);
+    }
+  }
+
+  String get(int row, int col) {
+    _checkDisposed();
+    final resultC = _bridge._matrixGetElement(_ptr, row, col);
+    if (resultC == nullptr) {
+      throw SymbolicMathException('matrix_get', 'Failed to get element at ($row, $col)');
+    }
+    
+    try {
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('matrix_get', result);
+      }
+      return result;
+    } finally {
+      _bridge._freeString(resultC);
+    }
+  }
+  
+  String getDeterminant() {
+    _checkDisposed();
+    final resultC = _bridge._matrixDet(_ptr);
+    if (resultC == nullptr) {
+      throw SymbolicMathException('matrix_det', 'Failed to calculate determinant');
+    }
+    
+    try {
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('matrix_det', result);
+      }
+      return result;
+    } finally {
+      _bridge._freeString(resultC);
+    }
+  }
+  
+  SymEngineMatrix inverse() {
+    _checkDisposed();
+    final resultPtr = _bridge._matrixInv(_ptr);
+    if (resultPtr == nullptr) {
+      throw SymbolicMathException('matrix_inv', 'Matrix inversion failed');
+    }
+    return SymEngineMatrix._fromPointer(resultPtr, _bridge, _rows, _cols);
+  }
+
+  SymEngineMatrix operator +(SymEngineMatrix other) {
+    _checkDisposed();
+    other._checkDisposed();
+    final resultPtr = _bridge._matrixAdd(_ptr, other._ptr);
+    if (resultPtr == nullptr) {
+      throw SymbolicMathException('matrix_add', 'Matrix addition failed');
+    }
+    return SymEngineMatrix._fromPointer(resultPtr, _bridge, _rows, _cols);
+  }
+  
+  SymEngineMatrix operator *(SymEngineMatrix other) {
+    _checkDisposed();
+    other._checkDisposed();
+    final resultPtr = _bridge._matrixMul(_ptr, other._ptr);
+    if (resultPtr == nullptr) {
+      throw SymbolicMathException('matrix_mul', 'Matrix multiplication failed');
+    }
+    return SymEngineMatrix._fromPointer(resultPtr, _bridge, _rows, other._cols);
+  }
+
+  @override
+  String toString() {
+    _checkDisposed();
+    final resultC = _bridge._matrixToString(_ptr);
+    if (resultC == nullptr) {
+      return 'Matrix(disposed or error)';
+    }
+    
+    try {
+      return resultC.toDartString();
+    } finally {
+      _bridge._freeString(resultC);
+    }
+  }
+}
+
+// ============================================================================
+// MAIN BRIDGE CLASS
+// ============================================================================
 
 class SymbolicMathBridge {
   static final SymbolicMathBridge _instance = SymbolicMathBridge._internal();
@@ -61,21 +232,36 @@ class SymbolicMathBridge {
 
   late final DynamicLibrary _dylib;
 
-  // --- Dart Function Lookups ---
+  // SymEngine wrapper functions
   late final _EvaluateDart _evaluate;
   late final _SolveDart _solve;
   late final _UnaryFuncDart _expand;
+  late final _UnaryFuncDart _simplify;
+  late final _UnaryFuncDart _factor;
   late final _SolveDart _differentiate;
+  late final _SolveDart? _integrate;
   late final _SubstituteDart _substitute;
   late final _FreeStringDart _freeString;
+  late final _GetVersionDart _version;
+  late final _GetConstantDart _testBasic;
+  late final _GetConstantDart _testSymbolic;
+  
+  // Mathematical functions
   late final Map<String, _UnaryFuncDart> _unaryFunctions;
-  late final _GcdLcmDart _gcd;
-  late final _GcdLcmDart _lcm;
+  late final Map<String, _BinaryFuncDart> _binaryFunctions;
+  
+  // Number theory functions
+  late final _BinaryFuncDart _gcd;
+  late final _BinaryFuncDart _lcm;
   late final _FactorialDart _factorial;
   late final _FibonacciDart _fibonacci;
+  
+  // Constants
   late final _GetConstantDart _getPi;
   late final _GetConstantDart _getE;
   late final _GetConstantDart _getEulerGamma;
+  
+  // Matrix operations
   late final _MatrixNewDart _matrixNew;
   late final _MatrixFreeDart _matrixFree;
   late final _MatrixSetElementDart _matrixSetElement;
@@ -86,255 +272,549 @@ class SymbolicMathBridge {
   late final _MatrixBinaryOpDart _matrixAdd;
   late final _MatrixBinaryOpDart _matrixMul;
 
+  // Library availability flags
+  bool _symEngineAvailable = false;
+
   SymbolicMathBridge._internal() {
     _dylib = Platform.isIOS || Platform.isMacOS
         ? DynamicLibrary.process()
         : DynamicLibrary.open('libSymEngineFlutterWrapper.so');
 
-    _evaluate = _dylib.lookupFunction<_EvaluateC, _EvaluateDart>('flutter_symengine_evaluate');
-    _solve = _dylib.lookupFunction<_SolveC, _SolveDart>('flutter_symengine_solve');
-    _expand = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_expand');
-    _differentiate = _dylib.lookupFunction<_SolveC, _SolveDart>('flutter_symengine_differentiate');
-    _substitute = _dylib.lookupFunction<_SubstituteC, _SubstituteDart>('flutter_symengine_substitute');
-    _freeString = _dylib.lookupFunction<_FreeStringC, _FreeStringDart>('flutter_symengine_free_string');
+    _initializeSymEngine();
+    _initializeMatrixFinalizer();
+  }
 
-    _unaryFunctions = {
-      'abs': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_abs'),
-      'sin': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_sin'),
-      'cos': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_cos'),
-      'tan': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_tan'),
-      'asin': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_asin'),
-      'acos': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_acos'),
-      'atan': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_atan'),
-      'sinh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_sinh'),
-      'cosh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_cosh'),
-      'tanh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_tanh'),
-      'asinh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_asinh'),
-      'acosh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_acosh'),
-      'atanh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_atanh'),
-      'exp': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_exp'),
-      'log': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_log'),
-      'sqrt': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_sqrt'),
-      'gamma': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_gamma'),
-    };
+  void _initializeMatrixFinalizer() {
+    _matrixFinalizer = NativeFinalizer(
+      _dylib.lookup<NativeFunction<_MatrixFreeC>>('flutter_symengine_matrix_free')
+    );
+  }
 
-    _gcd = _dylib.lookupFunction<_GcdLcmC, _GcdLcmDart>('flutter_symengine_gcd');
-    _lcm = _dylib.lookupFunction<_GcdLcmC, _GcdLcmDart>('flutter_symengine_lcm');
-    _factorial = _dylib.lookupFunction<_FactorialC, _FactorialDart>('flutter_symengine_factorial');
-    _fibonacci = _dylib.lookupFunction<_FibonacciC, _FibonacciDart>('flutter_symengine_fibonacci');
+  void _initializeSymEngine() {
+    try {
+      // Core operations
+      _evaluate = _dylib.lookupFunction<_EvaluateC, _EvaluateDart>('flutter_symengine_evaluate');
+      _solve = _dylib.lookupFunction<_SolveC, _SolveDart>('flutter_symengine_solve');
+      _expand = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_expand');
+      _simplify = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_simplify');
+      _factor = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_factor');
+      _differentiate = _dylib.lookupFunction<_SolveC, _SolveDart>('flutter_symengine_differentiate');
+      // Integrate is present in some bridge builds and absent in others;
+      // look it up optionally and leave `_integrate = null` if missing.
+      try {
+        _integrate = _dylib.lookupFunction<_SolveC, _SolveDart>(
+            'flutter_symengine_integrate');
+      } catch (_) {
+        _integrate = null;
+      }
+      _substitute = _dylib.lookupFunction<_SubstituteC, _SubstituteDart>('flutter_symengine_substitute');
+      _freeString = _dylib.lookupFunction<_FreeStringC, _FreeStringDart>('flutter_symengine_free_string');
 
-    _getPi = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_pi');
-    _getE = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_e');
-    _getEulerGamma = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_euler_gamma');
+      // Utility functions - NOTE: version returns const char*, not char*
+      _version = _dylib.lookupFunction<_GetVersionC, _GetVersionDart>('flutter_symengine_version');
+      _testBasic = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_test_basic_operations');
+      _testSymbolic = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_test_symbolic');
+
+      // Mathematical functions
+      _unaryFunctions = {
+        'abs': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_abs'),
+        'sin': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_sin'),
+        'cos': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_cos'),
+        'tan': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_tan'),
+        'asin': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_asin'),
+        'acos': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_acos'),
+        'atan': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_atan'),
+        'sinh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_sinh'),
+        'cosh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_cosh'),
+        'tanh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_tanh'),
+        'asinh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_asinh'),
+        'acosh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_acosh'),
+        'atanh': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_atanh'),
+        'exp': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_exp'),
+        'log': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_log'),
+        'sqrt': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_sqrt'),
+        'gamma': _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>('flutter_symengine_gamma'),
+      };
+
+      // Binary functions (empty as none are implemented in your C wrapper)
+      _binaryFunctions = {};
+
+      // Number theory
+      _gcd = _dylib.lookupFunction<_BinaryFuncC, _BinaryFuncDart>('flutter_symengine_gcd');
+      _lcm = _dylib.lookupFunction<_BinaryFuncC, _BinaryFuncDart>('flutter_symengine_lcm');
+      _factorial = _dylib.lookupFunction<_FactorialC, _FactorialDart>('flutter_symengine_factorial');
+      _fibonacci = _dylib.lookupFunction<_FibonacciC, _FibonacciDart>('flutter_symengine_fibonacci');
+
+      // Constants
+      _getPi = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_pi');
+      _getE = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_e');
+      _getEulerGamma = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_euler_gamma');
+      
+      // Matrix operations
+      _matrixNew = _dylib.lookupFunction<_MatrixNewC, _MatrixNewDart>('flutter_symengine_matrix_new');
+      _matrixFree = _dylib.lookupFunction<_MatrixFreeC, _MatrixFreeDart>('flutter_symengine_matrix_free');
+      _matrixSetElement = _dylib.lookupFunction<_MatrixSetElementC, _MatrixSetElementDart>('flutter_symengine_matrix_set_element');
+      _matrixGetElement = _dylib.lookupFunction<_MatrixGetElementC, _MatrixGetElementDart>('flutter_symengine_matrix_get_element');
+      _matrixToString = _dylib.lookupFunction<_MatrixToStringC, _MatrixToStringDart>('flutter_symengine_matrix_to_string');
+      _matrixDet = _dylib.lookupFunction<_MatrixUnaryOpC, _MatrixUnaryOpDart>('flutter_symengine_matrix_det');
+      _matrixInv = _dylib.lookupFunction<_MatrixUnaryOpReturnsMatrixC, _MatrixUnaryOpReturnsMatrixDart>('flutter_symengine_matrix_inv');
+      _matrixAdd = _dylib.lookupFunction<_MatrixBinaryOpC, _MatrixBinaryOpDart>('flutter_symengine_matrix_add');
+      _matrixMul = _dylib.lookupFunction<_MatrixBinaryOpC, _MatrixBinaryOpDart>('flutter_symengine_matrix_mul');
+
+      _symEngineAvailable = true;
+    } catch (e) {
+      print('SymEngine initialization failed: $e');
+    }
+  }
+
+  // ============================================================================
+  // VALIDATION AND HELPER METHODS
+  // ============================================================================
+
+  bool isValidExpression(String expression) {
+    if (expression.trim().isEmpty) return false;
     
-    _matrixNew = _dylib.lookupFunction<_MatrixNewC, _MatrixNewDart>('flutter_symengine_matrix_new');
-    _matrixFree = _dylib.lookupFunction<_MatrixFreeC, _MatrixFreeDart>('flutter_symengine_matrix_free');
-    _matrixSetElement = _dylib.lookupFunction<_MatrixSetElementC, _MatrixSetElementDart>('flutter_symengine_matrix_set_element');
-    _matrixGetElement = _dylib.lookupFunction<_MatrixGetElementC, _MatrixGetElementDart>('flutter_symengine_matrix_get_element');
-    _matrixToString = _dylib.lookupFunction<_MatrixToStringC, _MatrixToStringDart>('flutter_symengine_matrix_to_string');
-    _matrixDet = _dylib.lookupFunction<_MatrixUnaryOpC, _MatrixUnaryOpDart>('flutter_symengine_matrix_det');
-    _matrixInv = _dylib.lookupFunction<_MatrixUnaryOpReturnsMatrixC, _MatrixUnaryOpReturnsMatrixDart>('flutter_symengine_matrix_inv');
-    _matrixAdd = _dylib.lookupFunction<_MatrixBinaryOpC, _MatrixBinaryOpDart>('flutter_symengine_matrix_add');
-    _matrixMul = _dylib.lookupFunction<_MatrixBinaryOpC, _MatrixBinaryOpDart>('flutter_symengine_matrix_mul');
+    int parenCount = 0;
+    for (int i = 0; i < expression.length; i++) {
+      if (expression[i] == '(') parenCount++;
+      if (expression[i] == ')') parenCount--;
+      if (parenCount < 0) return false;
+    }
+    return parenCount == 0;
   }
 
-  String _performStringOperation(_UnaryFuncDart op, String input) {
+  String _performStringOperation(_UnaryFuncDart op, String input, String operationName) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    
+    if (!isValidExpression(input)) {
+      throw SymbolicMathParseException(operationName, 'Invalid expression syntax');
+    }
+
     final inputC = input.toNativeUtf8();
-    final resultC = op(inputC);
-    final result = resultC.toDartString();
-    _freeString(resultC);
-    malloc.free(inputC);
-    return result;
+    try {
+      final resultC = op(inputC);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException(operationName);
+      }
+      
+      final result = resultC.toDartString();
+      
+      if (result.startsWith('Error in $operationName:')) {
+        final errorMsg = result.substring('Error in $operationName: '.length);
+        if (errorMsg.contains('parse')) {
+          throw SymbolicMathParseException(operationName, errorMsg);
+        }
+        throw SymbolicMathException(operationName, errorMsg);
+      }
+      
+      _freeString(resultC);
+      return result;
+    } finally {
+      malloc.free(inputC);
+    }
   }
 
-  // --- Public Dart API ---
+  String _performBinaryStringOperation(_BinaryFuncDart op, String input1, String input2, String operationName) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
 
-  String evaluate(String expression) => _performStringOperation(_evaluate, expression);
-  String expand(String expression) => _performStringOperation(_expand, expression);
+    final input1C = input1.toNativeUtf8();
+    final input2C = input2.toNativeUtf8();
+    try {
+      final resultC = op(input1C, input2C);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException(operationName);
+      }
+      
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException(operationName, result);
+      }
+      
+      _freeString(resultC);
+      return result;
+    } finally {
+      malloc.free(input1C);
+      malloc.free(input2C);
+    }
+  }
+
+  // ============================================================================
+  // PUBLIC API - SYMENGINE HIGH-LEVEL OPERATIONS
+  // ============================================================================
+
+  String evaluate(String expression) => _performStringOperation(_evaluate, expression, 'evaluate');
+  String expand(String expression) => _performStringOperation(_expand, expression, 'expand');
+  String simplify(String expression) => _performStringOperation(_simplify, expression, 'simplify');
+  String factor(String expression) => _performStringOperation(_factor, expression, 'factor');
 
   String solve(String expression, String symbol) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    
     final exprC = expression.toNativeUtf8();
     final symC = symbol.toNativeUtf8();
-    final resultC = _solve(exprC, symC);
-    final result = resultC.toDartString();
-    _freeString(resultC);
-    malloc.free(exprC);
-    malloc.free(symC);
-    return result;
+    try {
+      final resultC = _solve(exprC, symC);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException('solve');
+      }
+      
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('solve', result);
+      }
+      
+      _freeString(resultC);
+      return result;
+    } finally {
+      malloc.free(exprC);
+      malloc.free(symC);
+    }
   }
   
   String differentiate(String expression, String symbol) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    
     final exprC = expression.toNativeUtf8();
     final symC = symbol.toNativeUtf8();
-    final resultC = _differentiate(exprC, symC);
-    final result = resultC.toDartString();
-    _freeString(resultC);
-    malloc.free(exprC);
-    malloc.free(symC);
-    return result;
+    try {
+      final resultC = _differentiate(exprC, symC);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException('differentiate');
+      }
+      
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('differentiate', result);
+      }
+      
+      _freeString(resultC);
+      return result;
+    } finally {
+      malloc.free(exprC);
+      malloc.free(symC);
+    }
   }
   
+  /// Symbolic indefinite integration ∫ f dx. Returns the antiderivative as
+  /// a string. Whether this actually works depends on the C wrapper build —
+  /// some builds expose the symbol but return an error from SymEngine. Test
+  /// with `hasIntegrate` first if you want a safe fallback.
+  String integrate(String expression, String symbol) {
+    if (!_symEngineAvailable || _integrate == null) {
+      throw SymbolicMathNotAvailableException('SymEngine integrate');
+    }
+    final exprC = expression.toNativeUtf8();
+    final symC = symbol.toNativeUtf8();
+    try {
+      final resultC = _integrate!(exprC, symC);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException('integrate');
+      }
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('integrate', result);
+      }
+      _freeString(resultC);
+      return result;
+    } finally {
+      malloc.free(exprC);
+      malloc.free(symC);
+    }
+  }
+
+  /// True if the underlying wrapper exposes the integrate entry point.
+  /// Callers can use this to switch between symbolic and numerical paths.
+  bool get hasIntegrate => _symEngineAvailable && _integrate != null;
+
   String substitute(String expression, String symbol, String value) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    
     final exprC = expression.toNativeUtf8();
     final symC = symbol.toNativeUtf8();
     final valC = value.toNativeUtf8();
-    final resultC = _substitute(exprC, symC, valC);
-    final result = resultC.toDartString();
-    _freeString(resultC);
-    malloc.free(exprC);
-    malloc.free(symC);
-    malloc.free(valC);
-    return result;
-  }
-  
-  String callUnary(String funcName, String expression) {
-      final func = _unaryFunctions[funcName];
-      if (func == null) {
-          throw ArgumentError('Unknown unary function: $funcName');
+    try {
+      final resultC = _substitute(exprC, symC, valC);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException('substitute');
       }
-      return _performStringOperation(func, expression);
-  }
-
-  String gcd(String a, String b) {
-    final aC = a.toNativeUtf8();
-    final bC = b.toNativeUtf8();
-    final resultC = _gcd(aC, bC);
-    final result = resultC.toDartString();
-    _freeString(resultC);
-    malloc.free(aC);
-    malloc.free(bC);
-    return result;
-  }
-
-  String lcm(String a, String b) {
-    final aC = a.toNativeUtf8();
-    final bC = b.toNativeUtf8();
-    final resultC = _lcm(aC, bC);
-    final result = resultC.toDartString();
-    _freeString(resultC);
-    malloc.free(aC);
-    malloc.free(bC);
-    return result;
-  }
-  
-  String factorial(int n) {
-      final resultC = _factorial(n);
+      
       final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('substitute', result);
+      }
+      
       _freeString(resultC);
       return result;
+    } finally {
+      malloc.free(exprC);
+      malloc.free(symC);
+      malloc.free(valC);
+    }
+  }
+  
+  // Mathematical functions
+  String callUnary(String funcName, String expression) {
+    final func = _unaryFunctions[funcName];
+    if (func == null) {
+      throw ArgumentError('Unknown unary function: $funcName');
+    }
+    return _performStringOperation(func, expression, funcName);
+  }
+
+  String callBinary(String funcName, String expr1, String expr2) {
+    final func = _binaryFunctions[funcName];
+    if (func == null) {
+      throw ArgumentError('Unknown binary function: $funcName');
+    }
+    return _performBinaryStringOperation(func, expr1, expr2, funcName);
+  }
+
+  // Number theory
+  String gcd(String a, String b) => _performBinaryStringOperation(_gcd, a, b, 'gcd');
+  String lcm(String a, String b) => _performBinaryStringOperation(_lcm, a, b, 'lcm');
+  
+  String factorial(int n) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    if (n < 0) {
+      throw SymbolicMathException('factorial', 'Input must be non-negative');
+    }
+    
+    final resultC = _factorial(n);
+    if (resultC == nullptr) {
+      throw SymbolicMathMemoryException('factorial');
+    }
+    
+    try {
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('factorial', result);
+      }
+      return result;
+    } finally {
+      _freeString(resultC);
+    }
   }
   
   String fibonacci(int n) {
-      final resultC = _fibonacci(n);
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    if (n < 0) {
+      throw SymbolicMathException('fibonacci', 'Input must be non-negative');
+    }
+    
+    final resultC = _fibonacci(n);
+    if (resultC == nullptr) {
+      throw SymbolicMathMemoryException('fibonacci');
+    }
+    
+    try {
       final result = resultC.toDartString();
-      _freeString(resultC);
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('fibonacci', result);
+      }
       return result;
+    } finally {
+      _freeString(resultC);
+    }
   }
-  
+
+  // Constants
   String getPi() {
-      final resultC = _getPi();
-      final result = resultC.toDartString();
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    
+    final resultC = _getPi();
+    if (resultC == nullptr) {
+      throw SymbolicMathMemoryException('getPi');
+    }
+    
+    try {
+      return resultC.toDartString();
+    } finally {
       _freeString(resultC);
-      return result;
+    }
   }
 
   String getE() {
-      final resultC = _getE();
-      final result = resultC.toDartString();
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    
+    final resultC = _getE();
+    if (resultC == nullptr) {
+      throw SymbolicMathMemoryException('getE');
+    }
+    
+    try {
+      return resultC.toDartString();
+    } finally {
       _freeString(resultC);
-      return result;
+    }
   }
   
   String getEulerGamma() {
-      final resultC = _getEulerGamma();
-      final result = resultC.toDartString();
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    
+    final resultC = _getEulerGamma();
+    if (resultC == nullptr) {
+      throw SymbolicMathMemoryException('getEulerGamma');
+    }
+    
+    try {
+      return resultC.toDartString();
+    } finally {
       _freeString(resultC);
-      return result;
+    }
   }
 
+  String getConstant(String name) {
+    switch (name.toUpperCase()) {
+      case 'PI': return getPi();
+      case 'E': return getE();
+      case 'GAMMA': return getEulerGamma();
+      default: throw ArgumentError('Unknown constant: $name');
+    }
+  }
+
+  // Matrix operations
   SymEngineMatrix createMatrix(int rows, int cols) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('SymEngine');
+    }
+    if (rows <= 0 || cols <= 0) {
+      throw SymbolicMathException('matrix_create', 'Dimensions must be positive');
+    }
+    
     final ptr = _matrixNew(rows, cols);
     if (ptr == nullptr) {
-        throw Exception('Failed to create matrix in native code.');
+      throw SymbolicMathMemoryException('matrix_create');
     }
-    return SymEngineMatrix._fromPointer(ptr, this);
+    return SymEngineMatrix._fromPointer(ptr, this, rows, cols);
+  }
+
+  // Batch operations for efficiency
+  Map<String, String> evaluateMultiple(List<String> expressions) {
+    final results = <String, String>{};
+    for (int i = 0; i < expressions.length; i++) {
+      try {
+        results['expr_$i'] = evaluate(expressions[i]);
+      } catch (e) {
+        results['expr_$i'] = 'Error: $e';
+      }
+    }
+    return results;
+  }
+
+  // ============================================================================
+  // UTILITY AND TEST METHODS
+  // ============================================================================
+
+  String getVersion() {
+    if (!_symEngineAvailable) {
+      return 'SymEngine not available';
+    }
+    
+    final resultC = _version();
+    // Note: version() returns const char*, don't free it
+    return resultC.toDartString();
+  }
+
+  String testBasicOperations() {
+    if (!_symEngineAvailable) {
+      return 'SymEngine not available';
+    }
+    
+    final resultC = _testBasic();
+    if (resultC == nullptr) {
+      return 'Test failed';
+    }
+    
+    try {
+      return resultC.toDartString();
+    } finally {
+      _freeString(resultC);
+    }
+  }
+
+  String testSymbolic() {
+    if (!_symEngineAvailable) {
+      return 'SymEngine not available';
+    }
+    
+    final resultC = _testSymbolic();
+    if (resultC == nullptr) {
+      return 'Test failed';
+    }
+    
+    try {
+      return resultC.toDartString();
+    } finally {
+      _freeString(resultC);
+    }
+  }
+
+  Map<String, bool> getLibraryStatus() {
+    return {
+      'SymEngine Wrapper': _symEngineAvailable,
+      'GMP Direct': false, // Not implemented yet
+      'MPFR Direct': false, // Not implemented yet  
+      'MPC Direct': false, // Not implemented yet
+      'FLINT Direct': false, // Not implemented yet
+    };
+  }
+
+  String getPreferredWrapperType() {
+    if (_symEngineAvailable) return 'SymEngine Flutter Wrapper';
+    return 'None Available';
+  }
+
+  List<String> getAvailableUnaryFunctions() {
+    return _unaryFunctions.keys.toList();
+  }
+
+  List<String> getAvailableBinaryFunctions() {
+    return _binaryFunctions.keys.toList();
+  }
+
+  List<String> getAvailableConstants() {
+    return ['PI', 'E', 'GAMMA'];
+  }
+
+  // ============================================================================
+  // HIGH-PRECISION METHODS - Add implementations as needed
+  // ============================================================================
+
+  // High-precision evaluation using MPFR
+  String evaluateWithPrecision(String expression, int precision) {
+    // TODO: Implement later
+    throw SymbolicMathNotAvailableException('MPFR high-precision evaluation');
+  }
+
+  // GMP arbitrary precision power
+  String gmpPower(String base, int exponent) {
+    // TODO: Implement later
+    throw SymbolicMathNotAvailableException('GMP power operation');
+  }
+
+  // MPFR high-precision pi calculation
+  String mpfrHighPrecisionPi(int precision) {
+    // TODO: Implement later
+    throw SymbolicMathNotAvailableException('MPFR high-precision pi');
   }
 }
-
-// --- Matrix Class with Opaque Pointer and Finalizer ---
-
-// **FIX:** Look up the function pointer directly for the finalizer.
-final _finalizer = NativeFinalizer(
-  SymbolicMathBridge()._dylib.lookup<NativeFunction<_MatrixFreeC>>('flutter_symengine_matrix_free')
-);
-
-// **FIX:** Implement Finalizable to be used with NativeFinalizer.
-class SymEngineMatrix implements Finalizable {
-    late final Pointer<Void> _ptr;
-    final SymbolicMathBridge _bridge;
-
-    SymEngineMatrix._fromPointer(this._ptr, this._bridge) {
-        _finalizer.attach(this, _ptr, detach: this);
-    }
-
-    void dispose() {
-        _finalizer.detach(this);
-        _bridge._matrixFree(_ptr);
-    }
-
-    void set(int row, int col, String value) {
-        final valueC = value.toNativeUtf8();
-        final result = _bridge._matrixSetElement(_ptr, row, col, valueC);
-        malloc.free(valueC);
-        if (result != 0) {
-            throw Exception('Failed to set matrix element. Error code: $result');
-        }
-    }
-
-    String get(int row, int col) {
-        final resultC = _bridge._matrixGetElement(_ptr, row, col);
-        final result = resultC.toDartString();
-        _bridge._freeString(resultC);
-        return result;
-    }
-    
-    String getDeterminant() {
-        final resultC = _bridge._matrixDet(_ptr);
-        final result = resultC.toDartString();
-        _bridge._freeString(resultC);
-        return result;
-    }
-    
-    SymEngineMatrix inverse() {
-        final resultPtr = _bridge._matrixInv(_ptr);
-        if (resultPtr == nullptr) {
-            throw Exception('Matrix inversion failed in native code.');
-        }
-        return SymEngineMatrix._fromPointer(resultPtr, _bridge);
-    }
-
-    SymEngineMatrix operator +(SymEngineMatrix other) {
-        final resultPtr = _bridge._matrixAdd(_ptr, other._ptr);
-        if (resultPtr == nullptr) {
-            throw Exception('Matrix addition failed in native code.');
-        }
-        return SymEngineMatrix._fromPointer(resultPtr, _bridge);
-    }
-    
-    SymEngineMatrix operator *(SymEngineMatrix other) {
-        final resultPtr = _bridge._matrixMul(_ptr, other._ptr);
-        if (resultPtr == nullptr) {
-            throw Exception('Matrix multiplication failed in native code.');
-        }
-        return SymEngineMatrix._fromPointer(resultPtr, _bridge);
-    }
-
-    @override
-    String toString() {
-        final resultC = _bridge._matrixToString(_ptr);
-        final result = resultC.toDartString();
-        _bridge._freeString(resultC);
-        return result;
-    }
-}
-
