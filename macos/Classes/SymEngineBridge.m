@@ -19,8 +19,13 @@ extern char* flutter_symengine_solve(const char* expression, const char* symbol)
 extern char* flutter_symengine_expand(const char* expression);
 extern char* flutter_symengine_factor(const char* expression);
 extern char* flutter_symengine_differentiate(const char* expression, const char* symbol);
+extern char* flutter_symengine_integrate(const char* expression, const char* symbol);
+extern char* flutter_symengine_simplify(const char* expression);
 extern char* flutter_symengine_substitute(const char* expression, const char* symbol, const char* value);
 extern void flutter_symengine_free_string(char* str);
+extern char* flutter_symengine_version(void);
+extern char* flutter_symengine_test_basic_operations(void);
+extern char* flutter_symengine_test_symbolic(void);
 // Math Functions
 extern char* flutter_symengine_abs(const char* expression);
 extern char* flutter_symengine_sin(const char* expression);
@@ -130,8 +135,13 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         flutter_symengine_expand,
         flutter_symengine_factor,
         flutter_symengine_differentiate,
+        flutter_symengine_integrate,
+        flutter_symengine_simplify,
         flutter_symengine_substitute,
         flutter_symengine_free_string,
+        flutter_symengine_version,
+        flutter_symengine_test_basic_operations,
+        flutter_symengine_test_symbolic,
         flutter_symengine_abs,
         flutter_symengine_sin,
         flutter_symengine_cos,
