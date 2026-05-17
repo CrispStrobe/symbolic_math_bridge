@@ -120,6 +120,16 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
 @interface SymEngineBridge : NSObject
 @end
 
+// Global volatile sink. Each address we pour into this prevents the compiler
+// from constant-propagating the function-pointer initializers in refs[] away.
+// Without `volatile` here, LTO in macOS Release builds proves the array is
+// only read once (in `refs[0] == NULL`), folds the comparison to a constant,
+// and strips the array — which means the wrapper objects never get pulled
+// in from the static archive, and dart:ffi `dlsym` fails at runtime. We
+// learned this the hard way: see PLAN.md P1#2 / HISTORY.md round 13.
+__attribute__((visibility("default")))
+volatile void* symbolic_math_bridge_force_link_sink = NULL;
+
 @implementation SymEngineBridge
 
 + (void)load {
@@ -173,11 +183,17 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         (void *)fmpz_init, (void *)fmpz_clear, (void *)fmpz_set_ui, (void *)fmpz_get_str, (void *)fmpz_add, (void *)fmpz_mul, (void *)fmpz_pow_ui, (void *)fmpz_cmp, (void *)fmpz_abs, (void *)fmpz_fac_ui
     };
 
-    if (refs[0] == NULL) {
-        NSLog(@"[SYMBOLIC_MATH] Math library symbols loaded (dummy check)");
-    } else {
-        NSLog(@"[SYMBOLIC_MATH] Successfully loaded %lu symbols from math libraries", (unsigned long)(sizeof(refs) / sizeof(void*)));
+    // Pour every function pointer into a volatile global sink. Volatile
+    // stores are side effects the optimizer is forbidden from eliminating,
+    // so each address has to actually be materialized — which in turn
+    // forces the linker to pull the defining object out of the static
+    // archive. Do not "simplify" this loop unless you want release builds
+    // to silently drop the wrapper again.
+    const size_t n = sizeof(refs) / sizeof(refs[0]);
+    for (size_t i = 0; i < n; i++) {
+        symbolic_math_bridge_force_link_sink = refs[i];
     }
+    NSLog(@"[SYMBOLIC_MATH] Linked %lu math symbols", (unsigned long)n);
 }
 
 @end
