@@ -14,29 +14,32 @@ Pod::Spec.new do |s|
   s.static_framework = true
   s.swift_version = '5.0'
 
-  # CRITICAL: Force all library symbols to be linked and available for dlsym()
-  # The SymEngineBridge.m +load method will reference all symbols to ensure linking
+  # `-lc++` because SymEngine uses C++ stdlib.
+  # `-lsymengine_flutter_wrapper` pulls in the big archive (~3000 SymEngine
+  # symbols). `-Wl,-force_load,…FlutterSymEngineWrapperOnly…` pulls in the
+  # tiny archive with just the 45 C wrapper entry points — they're
+  # separated so we can force-load only the wrapper objects without
+  # double-loading SymEngine (which would trip duplicate-symbol errors).
+  # Without this split, release builds silently drop every
+  # `flutter_symengine_*` symbol (the linker doesn't see them as
+  # referenced because they're only reached via dlsym at runtime).
   s.pod_target_xcconfig = {
     'OTHER_LDFLAGS' => [
       '-lc++',
-      '-lsymengine_flutter_wrapper',  # Updated to match the actual library name
-      # Force load to ensure symbols survive linking and are available at runtime
-      '-all_load'
+      '-lsymengine_flutter_wrapper',
+      '-Wl,-force_load,${PODS_TARGET_SRCROOT}/FlutterSymEngineWrapperOnly.xcframework/ios-arm64/libflutter_symengine_wrapper_only.a',
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',
-    # 'HEADER_SEARCH_PATHS' => '$(inherited) $(PODS_TARGET_SRCROOT)/Headers',
-
-    # Ensure symbols aren't stripped during optimization
     'STRIP_STYLE' => 'debugging',
-    'DEAD_CODE_STRIPPING' => 'NO'
+    'DEAD_CODE_STRIPPING' => 'NO',
   }
 
-  # All XCFrameworks - these contain the actual library implementations
   s.vendored_frameworks = [
     'GMP.xcframework',
     'MPFR.xcframework',
     'MPC.xcframework',
     'FLINT.xcframework',
-    'SymEngineFlutterWrapper.xcframework'  # Use the properly built Flutter wrapper
+    'SymEngineFlutterWrapper.xcframework',
+    'FlutterSymEngineWrapperOnly.xcframework',
   ]
 end

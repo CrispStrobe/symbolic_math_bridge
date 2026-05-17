@@ -18,13 +18,20 @@ Pod::Spec.new do |s|
   s.static_framework = true
   s.swift_version    = '5.0'
 
-  # Match the iOS spec: force-load all native symbols so dart:ffi can find
-  # them at runtime via DynamicLibrary.process().
   s.pod_target_xcconfig = {
+    # `-lc++` because SymEngine uses C++ stdlib.
+    # `-lsymengine_flutter_wrapper` pulls in the big archive (SymEngine
+    # itself, ~3000 symbols). `-lflutter_symengine_wrapper_only` pulls
+    # in the tiny archive with just the 45 C wrapper entry points —
+    # they're separated so `-all_load` can force-load only the wrapper
+    # without trying to load every SymEngine object twice (which trips
+    # duplicate-symbol errors). Without the wrapper-only lib + its own
+    # force-load, release builds silently drop every flutter_symengine_*
+    # symbol; see HISTORY.md / PLAN.md round 11.
     'OTHER_LDFLAGS' => [
       '-lc++',
       '-lsymengine_flutter_wrapper',
-      '-all_load',
+      '-Wl,-force_load,${PODS_TARGET_SRCROOT}/FlutterSymEngineWrapperOnly.xcframework/macos-arm64_x86_64/libflutter_symengine_wrapper_only.a',
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',
     'STRIP_STYLE' => 'debugging',
@@ -32,15 +39,12 @@ Pod::Spec.new do |s|
     'DEFINES_MODULE' => 'YES',
   }
 
-  # Same xcframeworks the iOS spec uses. They live in the iOS plugin dir
-  # but each one ships a macos-arm64_x86_64 slice; we expose them here via
-  # symlinks so CocoaPods picks them up without `..` paths (which it doesn't
-  # accept in vendored_frameworks).
   s.vendored_frameworks = [
     'GMP.xcframework',
     'MPFR.xcframework',
     'MPC.xcframework',
     'FLINT.xcframework',
     'SymEngineFlutterWrapper.xcframework',
+    'FlutterSymEngineWrapperOnly.xcframework',
   ]
 end
