@@ -28,7 +28,6 @@ Pod::Spec.new do |s|
       '-lc++',
       '-lsymengine_flutter_wrapper',
       '-all_load',
-      '-Wl,-force_load,${PODS_TARGET_SRCROOT}/FlutterSymEngineWrapperOnly.xcframework/ios-arm64/libflutter_symengine_wrapper_only.a',
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',
     'STRIP_STYLE' => 'debugging',
@@ -41,6 +40,7 @@ Pod::Spec.new do |s|
     'MPC.xcframework',
     'FLINT.xcframework',
     'SymEngineFlutterWrapper.xcframework',
-    'FlutterSymEngineWrapperOnly.xcframework',
   ]
+  # FlutterSymEngineWrapperOnly.xcframework is in the repo for the
+  # release-link fix; not yet wired into the build. See macOS podspec.
 end

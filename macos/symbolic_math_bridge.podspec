@@ -32,12 +32,6 @@ Pod::Spec.new do |s|
       '-lc++',
       '-lsymengine_flutter_wrapper',
       '-all_load',
-      # Belt-and-braces: in addition to `-all_load` on the big archive,
-      # explicitly force-load the wrapper-only archive. The big-archive
-      # path keeps debug builds working (45 symbols land in
-      # crisp_calc.debug.dylib); the wrapper-only path is the seed for
-      # the release-build fix when the upstream link pipeline cooperates.
-      '-Wl,-force_load,${PODS_TARGET_SRCROOT}/FlutterSymEngineWrapperOnly.xcframework/macos-arm64_x86_64/libflutter_symengine_wrapper_only.a',
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',
     'STRIP_STYLE' => 'debugging',
@@ -51,6 +45,12 @@ Pod::Spec.new do |s|
     'MPC.xcframework',
     'FLINT.xcframework',
     'SymEngineFlutterWrapper.xcframework',
-    'FlutterSymEngineWrapperOnly.xcframework',
   ]
+  # FlutterSymEngineWrapperOnly.xcframework also lives in the repo (built
+  # to host the 45 C wrapper symbols in isolation, for the release-link
+  # fix). Not in `vendored_frameworks` yet — adding it broke debug builds
+  # because the CocoaPods-injected `-lflutter_symengine_wrapper_only`
+  # came before `-all_load` in OTHER_LDFLAGS, changing link ordering in a
+  # way the actual `ld` invocation didn't like. Will wire it up properly
+  # when P1#2 in CrispCalc's PLAN.md gets attention.
 end
