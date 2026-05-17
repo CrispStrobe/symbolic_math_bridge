@@ -120,16 +120,6 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
 @interface SymEngineBridge : NSObject
 @end
 
-// Global volatile sink. Each address we pour into this prevents the compiler
-// from constant-propagating the function-pointer initializers in refs[] away.
-// Without `volatile` here, LTO in macOS Release builds proves the array is
-// only read once (in `refs[0] == NULL`), folds the comparison to a constant,
-// and strips the array — which means the wrapper objects never get pulled
-// in from the static archive, and dart:ffi `dlsym` fails at runtime. We
-// learned this the hard way: see PLAN.md P1#2 / HISTORY.md round 13.
-__attribute__((visibility("default")))
-volatile void* symbolic_math_bridge_force_link_sink = NULL;
-
 @implementation SymEngineBridge
 
 + (void)load {
@@ -183,15 +173,27 @@ volatile void* symbolic_math_bridge_force_link_sink = NULL;
         (void *)fmpz_init, (void *)fmpz_clear, (void *)fmpz_set_ui, (void *)fmpz_get_str, (void *)fmpz_add, (void *)fmpz_mul, (void *)fmpz_pow_ui, (void *)fmpz_cmp, (void *)fmpz_abs, (void *)fmpz_fac_ui
     };
 
-    // Pour every function pointer into a volatile global sink. Volatile
-    // stores are side effects the optimizer is forbidden from eliminating,
-    // so each address has to actually be materialized — which in turn
-    // forces the linker to pull the defining object out of the static
-    // archive. Do not "simplify" this loop unless you want release builds
-    // to silently drop the wrapper again.
+    // Force the compiler to materialize every pointer in refs[].
+    //
+    // History: an earlier version used `if (refs[0] == NULL) { … }` to
+    // touch the array, and a follow-up used `static volatile void* sink;
+    // sink = refs[i]` in a loop. Both got optimized away in macOS Release
+    // LTO — the first because refs[0] is a constant function address that
+    // is never NULL, the second because successive writes to the same
+    // volatile location can be coalesced down to the final store (the
+    // earlier writes are dead even if the location is volatile). With
+    // the array gone, the linker stops pulling the wrapper objects out
+    // of libsymengine_flutter_wrapper.a and dart:ffi `dlsym` lookups
+    // fail at runtime in release builds. See PLAN.md P1#2.
+    //
+    // The empty `asm volatile` with `"r"` input constraint is the standard
+    // DoNotOptimize trick (cf. Google Benchmark): the optimizer must treat
+    // the address as consumed by external code, so it has to actually load
+    // the function pointer from memory, which pins the defining object in
+    // the link. Do not simplify.
     const size_t n = sizeof(refs) / sizeof(refs[0]);
     for (size_t i = 0; i < n; i++) {
-        symbolic_math_bridge_force_link_sink = refs[i];
+        __asm__ __volatile__("" : : "r"(refs[i]) : "memory");
     }
     NSLog(@"[SYMBOLIC_MATH] Linked %lu math symbols", (unsigned long)n);
 }
