@@ -53,8 +53,11 @@ extern char* flutter_symengine_fibonacci(int n);
 extern char* flutter_symengine_get_pi(void);
 extern char* flutter_symengine_get_e(void);
 extern char* flutter_symengine_get_euler_gamma(void);
-// Arbitrary-precision real constants (round-81 precision arc, via MPFR)
+// Arbitrary-precision real constants (rounds 85/86 precision arc, via MPFR)
 extern char* flutter_symengine_pi_with_precision(int decimal_digits);
+extern char* flutter_symengine_e_with_precision(int decimal_digits);
+extern char* flutter_symengine_euler_gamma_with_precision(int decimal_digits);
+extern char* flutter_symengine_sqrt2_with_precision(int decimal_digits);
 // Matrix Functions
 extern void* flutter_symengine_matrix_new(int rows, int cols);
 extern void flutter_symengine_matrix_free(void* matrix);
@@ -169,6 +172,9 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         flutter_symengine_get_e,
         flutter_symengine_get_euler_gamma,
         flutter_symengine_pi_with_precision,
+        flutter_symengine_e_with_precision,
+        flutter_symengine_euler_gamma_with_precision,
+        flutter_symengine_sqrt2_with_precision,
         flutter_symengine_matrix_new,
         flutter_symengine_matrix_free,
         flutter_symengine_matrix_set_element,

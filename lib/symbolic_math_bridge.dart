@@ -265,6 +265,9 @@ class SymbolicMathBridge {
   // basic_evalf). Optional — older bridge builds don't expose them;
   // a runtime null means "fall back to the standard constant".
   _FactorialDart? _piWithPrecision;
+  _FactorialDart? _eWithPrecision;
+  _FactorialDart? _eulerGammaWithPrecision;
+  _FactorialDart? _sqrt2WithPrecision;
   
   // Matrix operations
   late final _MatrixNewDart _matrixNew;
@@ -356,14 +359,33 @@ class SymbolicMathBridge {
       _getEulerGamma = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_euler_gamma');
 
       // Arbitrary-precision real constants. Looked up optionally —
-      // builds without the new wrappers leave _piWithPrecision null,
-      // and mpfrHighPrecisionPi throws SymbolicMathNotAvailableException
-      // when called.
+      // builds without the new wrappers leave each field null, and
+      // the corresponding mpfrHighPrecision* method throws
+      // SymbolicMathNotAvailableException when called.
       try {
         _piWithPrecision = _dylib.lookupFunction<_FactorialC, _FactorialDart>(
             'flutter_symengine_pi_with_precision');
       } catch (_) {
         _piWithPrecision = null;
+      }
+      try {
+        _eWithPrecision = _dylib.lookupFunction<_FactorialC, _FactorialDart>(
+            'flutter_symengine_e_with_precision');
+      } catch (_) {
+        _eWithPrecision = null;
+      }
+      try {
+        _eulerGammaWithPrecision =
+            _dylib.lookupFunction<_FactorialC, _FactorialDart>(
+                'flutter_symengine_euler_gamma_with_precision');
+      } catch (_) {
+        _eulerGammaWithPrecision = null;
+      }
+      try {
+        _sqrt2WithPrecision = _dylib.lookupFunction<_FactorialC, _FactorialDart>(
+            'flutter_symengine_sqrt2_with_precision');
+      } catch (_) {
+        _sqrt2WithPrecision = null;
       }
       
       // Matrix operations
@@ -863,4 +885,51 @@ class SymbolicMathBridge {
       _freeString(resultC);
     }
   }
+
+  // Shared helper for the round-86 MPFR constants. `fn` is the
+  // resolved native lookup (may be null on older bridge builds);
+  // `op` is the label used in exceptions.
+  String _callPrecisionFn(_FactorialDart? fn, String op, int precision) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('MPFR high-precision $op');
+    }
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+          'flutter_symengine_${op}_with_precision (older bridge build — '
+          'rebuild from math-stack-ios-builder)');
+    }
+    if (precision < 1 || precision > 10000) {
+      throw SymbolicMathException(
+          '${op}_with_precision',
+          'precision must be in 1..10000 (got $precision)');
+    }
+    final resultC = fn(precision);
+    if (resultC == nullptr) {
+      throw SymbolicMathException(
+          '${op}_with_precision', 'native returned null');
+    }
+    try {
+      final result = resultC.toDartString();
+      if (result.startsWith('Error in ')) {
+        throw SymbolicMathException('${op}_with_precision', result);
+      }
+      return result;
+    } finally {
+      _freeString(resultC);
+    }
+  }
+
+  // MPFR high-precision e. See [mpfrHighPrecisionPi] for the
+  // implementation pattern; the wrapper uses basic_const_E.
+  String mpfrHighPrecisionE(int precision) =>
+      _callPrecisionFn(_eWithPrecision, 'e', precision);
+
+  // MPFR high-precision Euler–Mascheroni constant γ. Wrapper uses
+  // basic_const_EulerGamma.
+  String mpfrHighPrecisionEulerGamma(int precision) =>
+      _callPrecisionFn(_eulerGammaWithPrecision, 'euler_gamma', precision);
+
+  // MPFR high-precision √2. Wrapper parses `sqrt(2)` and evaluates.
+  String mpfrHighPrecisionSqrt2(int precision) =>
+      _callPrecisionFn(_sqrt2WithPrecision, 'sqrt2', precision);
 }
