@@ -62,6 +62,7 @@ extern char* flutter_symengine_sqrt2_with_precision(int decimal_digits);
 extern char* flutter_symengine_isprime(const char* n);
 extern char* flutter_symengine_nextprime(const char* n);
 extern char* flutter_symengine_prevprime(const char* n);
+extern char* flutter_symengine_factorint(const char* n);
 // Matrix Functions
 extern void* flutter_symengine_matrix_new(int rows, int cols);
 extern void flutter_symengine_matrix_free(void* matrix);
@@ -129,6 +130,16 @@ extern void fmpz_pow_ui(void* f, const void* g, unsigned long exp);
 extern int fmpz_cmp(const void* f, const void* g);
 extern void fmpz_abs(void* f1, const void* f2);
 extern void fmpz_fac_ui(void* f, unsigned long n);
+// Round 90: fmpz_factor + helpers used by the factorint wrapper.
+extern int fmpz_set_str(void* f, const char* s, int b);
+extern unsigned long fmpz_sizeinbase(const void* f, int b);
+extern int fmpz_is_zero(const void* f);
+extern int fmpz_is_one(const void* f);
+extern int fmpz_sgn(const void* f);
+extern void fmpz_neg(void* f, const void* g);
+extern void fmpz_factor_init(void* f);
+extern void fmpz_factor_clear(void* f);
+extern void fmpz_factor(void* f, const void* n);
 
 
 @interface SymEngineBridge : NSObject
@@ -182,6 +193,7 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         flutter_symengine_isprime,
         flutter_symengine_nextprime,
         flutter_symengine_prevprime,
+        flutter_symengine_factorint,
         flutter_symengine_matrix_new,
         flutter_symengine_matrix_free,
         flutter_symengine_matrix_set_element,
@@ -196,7 +208,8 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         (void *)__gmpz_init, (void *)__gmpz_init_set_str, (void *)__gmpz_clear, (void *)__gmpz_get_str, (void *)__gmpz_set_ui, (void *)__gmpz_set_si, (void *)__gmpz_add, (void *)__gmpz_add_ui, (void *)__gmpz_sub, (void *)__gmpz_mul, (void *)__gmpz_mul_ui, (void *)__gmpz_pow_ui, (void *)__gmpz_gcd, (void *)__gmpz_cmp, (void *)__gmpz_cmp_ui, (void *)__gmpz_abs, (void *)__gmpz_neg, (void *)__gmpz_sqrt, (void *)__gmpz_fac_ui,
         (void *)mpfr_init2, (void *)mpfr_clear, (void *)mpfr_set_ui, (void *)mpfr_set_d, (void *)mpfr_get_str, (void *)mpfr_get_d, (void *)mpfr_add, (void *)mpfr_mul, (void *)mpfr_sqrt, (void *)mpfr_const_pi, (void *)mpfr_sin, (void *)mpfr_cos,
         (void *)mpc_init2, (void *)mpc_clear, (void *)mpc_set_ui_ui, (void *)mpc_get_str, (void *)mpc_add, (void *)mpc_mul, (void *)mpc_sqrt,
-        (void *)fmpz_init, (void *)fmpz_clear, (void *)fmpz_set_ui, (void *)fmpz_get_str, (void *)fmpz_add, (void *)fmpz_mul, (void *)fmpz_pow_ui, (void *)fmpz_cmp, (void *)fmpz_abs, (void *)fmpz_fac_ui
+        (void *)fmpz_init, (void *)fmpz_clear, (void *)fmpz_set_ui, (void *)fmpz_get_str, (void *)fmpz_add, (void *)fmpz_mul, (void *)fmpz_pow_ui, (void *)fmpz_cmp, (void *)fmpz_abs, (void *)fmpz_fac_ui,
+        (void *)fmpz_set_str, (void *)fmpz_sizeinbase, (void *)fmpz_is_zero, (void *)fmpz_is_one, (void *)fmpz_sgn, (void *)fmpz_neg, (void *)fmpz_factor_init, (void *)fmpz_factor_clear, (void *)fmpz_factor
     };
 
     // Force the compiler to materialize every pointer in refs[].

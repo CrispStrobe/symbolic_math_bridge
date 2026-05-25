@@ -274,6 +274,8 @@ class SymbolicMathBridge {
   _UnaryFuncDart? _isprime;
   _UnaryFuncDart? _nextprime;
   _UnaryFuncDart? _prevprime;
+  // Round 90: integer factorization via FLINT.
+  _UnaryFuncDart? _factorint;
   
   // Matrix operations
   late final _MatrixNewDart _matrixNew;
@@ -414,6 +416,12 @@ class SymbolicMathBridge {
             'flutter_symengine_prevprime');
       } catch (_) {
         _prevprime = null;
+      }
+      try {
+        _factorint = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>(
+            'flutter_symengine_factorint');
+      } catch (_) {
+        _factorint = null;
       }
 
       // Matrix operations
@@ -1001,4 +1009,10 @@ class SymbolicMathBridge {
 
   String ntheoryPrevprime(String n) =>
       _callStringInOut(_prevprime, 'prevprime', n);
+
+  // Round 90: integer factorization via FLINT. Returns the raw
+  // `"p1^e1*p2^e2*..."` string; the CrispCalc engine parses this
+  // into structured `(prime, exponent)` records.
+  String ntheoryFactorint(String n) =>
+      _callStringInOut(_factorint, 'factorint', n);
 }
