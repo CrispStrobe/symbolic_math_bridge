@@ -260,6 +260,11 @@ class SymbolicMathBridge {
   late final _GetConstantDart _getPi;
   late final _GetConstantDart _getE;
   late final _GetConstantDart _getEulerGamma;
+
+  // Arbitrary-precision real constants (via MPFR through SymEngine's
+  // basic_evalf). Optional — older bridge builds don't expose them;
+  // a runtime null means "fall back to the standard constant".
+  _FactorialDart? _piWithPrecision;
   
   // Matrix operations
   late final _MatrixNewDart _matrixNew;
@@ -349,6 +354,17 @@ class SymbolicMathBridge {
       _getPi = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_pi');
       _getE = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_e');
       _getEulerGamma = _dylib.lookupFunction<_GetConstantC, _GetConstantDart>('flutter_symengine_get_euler_gamma');
+
+      // Arbitrary-precision real constants. Looked up optionally —
+      // builds without the new wrappers leave _piWithPrecision null,
+      // and mpfrHighPrecisionPi throws SymbolicMathNotAvailableException
+      // when called.
+      try {
+        _piWithPrecision = _dylib.lookupFunction<_FactorialC, _FactorialDart>(
+            'flutter_symengine_pi_with_precision');
+      } catch (_) {
+        _piWithPrecision = null;
+      }
       
       // Matrix operations
       _matrixNew = _dylib.lookupFunction<_MatrixNewC, _MatrixNewDart>('flutter_symengine_matrix_new');
@@ -812,9 +828,39 @@ class SymbolicMathBridge {
     throw SymbolicMathNotAvailableException('GMP power operation');
   }
 
-  // MPFR high-precision pi calculation
+  // MPFR high-precision pi. [precision] is the requested number of
+  // decimal digits (1..10000). Implementation lives in
+  // flutter_symengine_pi_with_precision (math-stack-ios-builder /
+  // src/flutter_symengine_wrapper.c). The wrapper goes through
+  // SymEngine's basic_const_pi + basic_evalf at the bit precision
+  // derived from the requested decimal digits.
   String mpfrHighPrecisionPi(int precision) {
-    // TODO: Implement later
-    throw SymbolicMathNotAvailableException('MPFR high-precision pi');
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('MPFR high-precision pi');
+    }
+    final fn = _piWithPrecision;
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+          'flutter_symengine_pi_with_precision (older bridge build — '
+          'rebuild from math-stack-ios-builder)');
+    }
+    if (precision < 1 || precision > 10000) {
+      throw SymbolicMathException(
+          'pi_with_precision', 'precision must be in 1..10000 (got $precision)');
+    }
+    final resultC = fn(precision);
+    if (resultC == nullptr) {
+      throw SymbolicMathException(
+          'pi_with_precision', 'native returned null');
+    }
+    try {
+      final result = resultC.toDartString();
+      if (result.startsWith('Error in ')) {
+        throw SymbolicMathException('pi_with_precision', result);
+      }
+      return result;
+    } finally {
+      _freeString(resultC);
+    }
   }
 }
