@@ -47,6 +47,10 @@ extern char* flutter_symengine_pi_with_precision(int decimal_digits);
 extern char* flutter_symengine_e_with_precision(int decimal_digits);
 extern char* flutter_symengine_euler_gamma_with_precision(int decimal_digits);
 extern char* flutter_symengine_sqrt2_with_precision(int decimal_digits);
+// Number-theory primitives (round 89)
+extern char* flutter_symengine_isprime(const char* n);
+extern char* flutter_symengine_nextprime(const char* n);
+extern char* flutter_symengine_prevprime(const char* n);
 // Matrix Functions
 extern void* flutter_symengine_matrix_new(int rows, int cols);
 extern void flutter_symengine_matrix_free(void* matrix);
@@ -163,6 +167,9 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         flutter_symengine_e_with_precision,
         flutter_symengine_euler_gamma_with_precision,
         flutter_symengine_sqrt2_with_precision,
+        flutter_symengine_isprime,
+        flutter_symengine_nextprime,
+        flutter_symengine_prevprime,
         flutter_symengine_matrix_new,
         flutter_symengine_matrix_free,
         flutter_symengine_matrix_set_element,

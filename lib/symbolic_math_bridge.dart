@@ -268,6 +268,12 @@ class SymbolicMathBridge {
   _FactorialDart? _eWithPrecision;
   _FactorialDart? _eulerGammaWithPrecision;
   _FactorialDart? _sqrt2WithPrecision;
+
+  // Round 89: number-theory primitives. Same string-in/string-out
+  // signature as the existing unary functions.
+  _UnaryFuncDart? _isprime;
+  _UnaryFuncDart? _nextprime;
+  _UnaryFuncDart? _prevprime;
   
   // Matrix operations
   late final _MatrixNewDart _matrixNew;
@@ -387,7 +393,29 @@ class SymbolicMathBridge {
       } catch (_) {
         _sqrt2WithPrecision = null;
       }
-      
+
+      // Round 89: number-theory primitives. Each lookup is in its
+      // own try/catch so older bridge builds without one of the
+      // symbols (e.g. a build between rounds 88 and 89) still load.
+      try {
+        _isprime = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>(
+            'flutter_symengine_isprime');
+      } catch (_) {
+        _isprime = null;
+      }
+      try {
+        _nextprime = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>(
+            'flutter_symengine_nextprime');
+      } catch (_) {
+        _nextprime = null;
+      }
+      try {
+        _prevprime = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>(
+            'flutter_symengine_prevprime');
+      } catch (_) {
+        _prevprime = null;
+      }
+
       // Matrix operations
       _matrixNew = _dylib.lookupFunction<_MatrixNewC, _MatrixNewDart>('flutter_symengine_matrix_new');
       _matrixFree = _dylib.lookupFunction<_MatrixFreeC, _MatrixFreeDart>('flutter_symengine_matrix_free');
@@ -932,4 +960,45 @@ class SymbolicMathBridge {
   // MPFR high-precision √2. Wrapper parses `sqrt(2)` and evaluates.
   String mpfrHighPrecisionSqrt2(int precision) =>
       _callPrecisionFn(_sqrt2WithPrecision, 'sqrt2', precision);
+
+  // Round 89: number-theory primitives. Each accepts an arbitrary-
+  // precision decimal string. `isprime` returns "true" / "false";
+  // `nextprime` / `prevprime` return a decimal string.
+  String _callStringInOut(_UnaryFuncDart? fn, String op, String input) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException(op);
+    }
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+          'flutter_symengine_$op (older bridge build — rebuild from '
+          'math-stack-ios-builder)');
+    }
+    final inputC = input.toNativeUtf8();
+    try {
+      final resultC = fn(inputC);
+      if (resultC == nullptr) {
+        throw SymbolicMathException(op, 'native returned null');
+      }
+      try {
+        final result = resultC.toDartString();
+        if (result.startsWith('Error in ')) {
+          throw SymbolicMathException(op, result);
+        }
+        return result;
+      } finally {
+        _freeString(resultC);
+      }
+    } finally {
+      malloc.free(inputC);
+    }
+  }
+
+  bool ntheoryIsprime(String n) =>
+      _callStringInOut(_isprime, 'isprime', n) == 'true';
+
+  String ntheoryNextprime(String n) =>
+      _callStringInOut(_nextprime, 'nextprime', n);
+
+  String ntheoryPrevprime(String n) =>
+      _callStringInOut(_prevprime, 'prevprime', n);
 }
