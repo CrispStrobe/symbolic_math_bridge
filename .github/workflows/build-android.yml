@@ -134,23 +134,34 @@ jobs:
         run: |
           cmake --build build --parallel 4
 
-      - name: Inspect output
+      - name: Inspect + strip
+        # Strip the .so before uploading. Unstripped output is ~120 MB
+        # (carries debug_info from every static-linked SymEngine /
+        # FLINT / MPFR / GMP archive). Stripped is ~17 MB — comparable
+        # to the iOS xcframeworks (~12-15 MB per arch). The wrapper
+        # symbols ride in `.dynsym`, so strip --strip-debug or
+        # --strip-all both leave them visible to dlsym.
         run: |
-          echo "--- build/ binaries ---"
+          set -e
+          echo "--- build/ binaries (pre-strip) ---"
           find build -type f \( -name "*.so" -o -name "*.a" \) -exec ls -la {} \;
           SO=$(find build -name "libsymbolic_math_bridge.so" | head -1)
-          if [ -n "$SO" ]; then
-            echo
-            echo "--- exported flutter_symengine_* symbols in $SO ---"
-            "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" \
-              --defined-only --extern-only "$SO" 2>/dev/null | grep flutter_symengine_ | head -20
-            echo
-            echo "--- size + arch ---"
-            ls -la "$SO"
-            file "$SO"
-          else
+          if [ -z "$SO" ]; then
             echo "::warning::no libsymbolic_math_bridge.so produced"
+            exit 0
           fi
+          NDK_BIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo
+          echo "--- pre-strip: exported flutter_symengine_* count ---"
+          "${NDK_BIN}/llvm-nm" --defined-only --extern-only "$SO" 2>/dev/null | grep -c flutter_symengine_
+          "${NDK_BIN}/llvm-strip" --strip-all "$SO"
+          echo
+          echo "--- post-strip ---"
+          ls -la "$SO"
+          file "$SO"
+          echo
+          echo "--- post-strip: flutter_symengine_* still exported ---"
+          "${NDK_BIN}/llvm-nm" --defined-only --extern-only "$SO" 2>/dev/null | grep flutter_symengine_ | head -20
 
       - name: Upload plugin .so
         uses: actions/upload-artifact@v4

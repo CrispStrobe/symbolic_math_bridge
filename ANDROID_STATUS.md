@@ -1,31 +1,78 @@
-# Android — R132 scaffold + vcpkg path
+# Android — R132 GREEN (vcpkg + NDK chainload)
 
-**Status (2026-05-27): scaffold + GHA workflow on branch
-`r132-android-scaffold`. Not merged to main. Not pinned by CrispCalc.
-First workflow run pending.**
+**Status (2026-05-27): build-android.yml passing on branch
+`r132-android-scaffold`. `libsymbolic_math_bridge.so` for
+`arm64-v8a` committed at `android/src/main/jniLibs/arm64-v8a/`
+(17 MB stripped). Not yet merged to main. Not yet pinned by
+CrispCalc.**
 
-This branch lands two paths to a working `libsymbolic_math_bridge.so`:
+First successful run: `26513083096` — 14 min wall clock (vcpkg
+binary cache populated by earlier iteration runs). All 40+
+`flutter_symengine_*` symbols defined and exported in the .so.
 
-1. **vcpkg path (preferred, GHA-driven)** — mirrors R131 (Windows). The
-   plugin's `android/CMakeLists.txt` calls `find_package(symengine
-   CONFIG)`; the `build-android.yml` workflow runs `vcpkg install
-   symengine[arb,flint,mpfr]` against the `arm64-android-release`
-   triplet on `ubuntu-latest` with the bundled Android NDK, then
-   builds the wrapper `.so` static-linked against everything. Single
-   `.so` per ABI, no hand-rolled NDK chain.
+## How we got here (iteration log)
 
-2. **jniLibs fallback (hand-rolled NDK)** — if vcpkg's symengine port
-   wedges against an Android triplet for some reason, the same
-   CMakeLists can consume per-ABI prebuilt `.a` archives at
-   `src/main/jniLibs/<abi>/`. Same shape iOS/macOS use via
-   `.xcframework` bundles. The `math-stack-android-builder` sibling
-   repo (parallel to `math-stack-ios-builder`) would produce those
-   archives; scaffold script at `scripts/build_android.sh`.
+7 iterations, 8 distinct failure modes — each one drilling one
+step deeper into the build:
 
-Whichever source resolves first wins. If neither is available, the
-`.so` still assembles (wrapper source compiled in) but FFI calls
-return errors — same degraded fallback as today's Linux / Windows
-builds.
+1. **vcpkg's mpfr port needed autoconf-archive + libtool** —
+   ubuntu-latest doesn't have them pre-installed. Added apt step.
+2. **`default-features: false` didn't drop LLVM** because the
+   symengine port's `arb` feature has a self-referencing
+   `symengine[flint]` dep without that flag set, which re-enables
+   the default `arb` + `llvm` + `mpfr` set. Killed the build
+   after 70 min on Android, 3h 39m on Windows. **Fix: drop `arb`
+   from our feature list** — CrispCalc doesn't use it.
+3. **`builtin-baseline` pin stale** — pinned ref wasn't in the
+   runner's bundled vcpkg history (different runner image
+   snapshot). Dropped the pin; will re-add with a `git fetch`
+   step when reproducibility matters.
+4. **JSON schema rejected unknown `_note_baseline` field**.
+   Cosmetic; removed.
+5. **`find_package(symengine)` lowercase** silently returned
+   not-found because vcpkg's port exports `SymEngineConfig.cmake`
+   (camelcase). Fix: `find_package(SymEngine ...)` + explicit
+   `${SYMENGINE_INCLUDE_DIRS}` + `${SYMENGINE_LIBRARIES}`
+   propagation (config uses legacy variable-style, not IMPORTED
+   target).
+6. **`<jni.h>` not on include path** for the standalone CMake
+   build (vcpkg's Android triplet sets the NDK toolchain but
+   doesn't add the JNI headers). Fix: split force_link.c into a
+   portable plain-C function + a JNI wrapper guarded by
+   `__has_include(<jni.h>)` so both Gradle and CI builds compile.
+7. **Host `/usr/bin/ld` (x86_64) cross-arch link error** —
+   "vcpkg_installed/arm64-android-release/lib/libsymengine.a:
+   file in wrong format". vcpkg's toolchain cross-compiles its
+   own port builds via VCPKG_TARGET_TRIPLET but doesn't propagate
+   the NDK toolchain to the consumer project. **Fix:
+   `VCPKG_CHAINLOAD_TOOLCHAIN_FILE` = NDK's
+   `android.toolchain.cmake`** so vcpkg's toolchain chainloads it
+   for both halves of the build.
+
+## Path
+
+The branch now lands two paths to a working
+`libsymbolic_math_bridge.so`:
+
+1. **vcpkg path (working, committed binary)** — `build-android.yml`
+   runs `vcpkg install symengine[flint,mpfr]` against the
+   `arm64-android-release` triplet on `ubuntu-latest` + bundled
+   Android NDK, then builds the wrapper `.so` static-linked against
+   everything. Stripped `.so` lands at
+   `src/main/jniLibs/arm64-v8a/libsymbolic_math_bridge.so` committed
+   to this branch so `pub get` consumers get it without running
+   vcpkg themselves.
+
+2. **jniLibs fallback (hand-rolled NDK)** — `android/CMakeLists.txt`
+   also supports per-ABI prebuilt `.a` archives at
+   `src/main/jniLibs/<abi>/lib*.a` (same shape iOS/macOS use via
+   `.xcframework` bundles). Path 1 is the one that actually shipped;
+   path 2 stays around for when we need armeabi-v7a or x86_64 and
+   want to revisit hand-rolling.
+
+If neither is available, the `.so` still assembles (wrapper source
+compiled in) but FFI calls return errors — same degraded fallback
+as today's Linux / Windows builds.
 
 ## What this branch *does* ship
 
