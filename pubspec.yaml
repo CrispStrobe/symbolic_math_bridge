@@ -1,6 +1,6 @@
 name: symbolic_math_bridge
 description: "A Flutter plugin providing a high-performance FFI bridge to the SymEngine symbolic math stack."
-version: 1.0.0
+version: 1.0.15-android-scaffold
 homepage:
 
 environment:
@@ -27,4 +27,15 @@ flutter:
         ffiPlugin: true
       macos:
         pluginClass: SwiftSymbolicMathBridgePlugin
+        ffiPlugin: true
+      # R132 scaffold (2026-05-27). The android/ directory carries the
+      # Gradle module + CMakeLists + Kotlin plugin glue + force-link C
+      # source, but the per-ABI prebuilt static archives
+      # (libgmp.a / libmpfr.a / libmpc.a / libflint.a / libsymengine.a /
+      # libsymengine_flutter_wrapper.a) are NOT yet shipped. CrispCalc
+      # users on Android continue to fall through to the "bridge
+      # unavailable" path until R132 completes (see ANDROID_STATUS.md).
+      android:
+        package: be.crispstro.symbolic_math_bridge
+        pluginClass: SymbolicMathBridgePlugin
         ffiPlugin: true
