@@ -1,0 +1,140 @@
+name: Build Android (vcpkg + NDK)
+
+# R132 (Android via vcpkg + Android NDK).
+#
+# Mirror of build-windows.yml but cross-compiling for Android. vcpkg's
+# community triplets cover Android (`arm64-android-release.cmake`,
+# `x64-android.cmake`, etc.) and the official `symengine` port +
+# transitive deps work on those triplets too — same pattern, no
+# hand-rolled NDK build chain needed.
+#
+# First-run vcpkg install is ~30-50 min cold (symengine + boost-math
+# + flint + arb + mpfr + mpir/gmp, all cross-compiled to arm64). The
+# x-gha binary cache makes subsequent runs ~5-10 min. arm64-v8a is
+# the only ABI exercised here — armeabi-v7a (32-bit) and x86_64
+# (emulator-only) are skipped for now; add to the matrix later if
+# real users need them.
+
+on:
+  push:
+    branches:
+      - 'r132-*'
+      - 'main'
+    paths:
+      - '.github/workflows/build-android.yml'
+      - 'android/**'
+      - 'src/**'
+      - 'pubspec.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read   # for the x-gha vcpkg binary cache
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  # The ubuntu-latest runner ships an Android NDK. Pin which one the
+  # toolchain uses for reproducibility; bump as we test newer NDKs.
+  # ANDROID_NDK_HOME is picked up by vcpkg's android triplets.
+  ANDROID_NDK_VERSION: "27.0.12077973"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        triplet: [arm64-android-release]
+        # add: x64-android (for emulator), arm-android (32-bit)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Export GHA cache env (for vcpkg x-gha)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Locate Android NDK
+        run: |
+          # Runner ships multiple NDKs under $ANDROID_SDK_ROOT/ndk/.
+          # Prefer the pinned version; fall back to whichever is present.
+          NDK_BASE="${ANDROID_SDK_ROOT}/ndk"
+          if [ -d "$NDK_BASE/${ANDROID_NDK_VERSION}" ]; then
+            NDK="$NDK_BASE/${ANDROID_NDK_VERSION}"
+          else
+            NDK="$(ls -d $NDK_BASE/* 2>/dev/null | sort -V | tail -n 1)"
+          fi
+          if [ ! -d "$NDK" ]; then
+            echo "::error::No Android NDK found under $NDK_BASE"
+            ls -la "$NDK_BASE" || true
+            exit 1
+          fi
+          echo "Using NDK at: $NDK"
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
+
+      - name: Use bundled vcpkg
+        run: |
+          if [ ! -x "${VCPKG_INSTALLATION_ROOT}/vcpkg" ]; then
+            echo "::error::vcpkg not at \$VCPKG_INSTALLATION_ROOT — runner image changed?"
+            exit 1
+          fi
+          echo "VCPKG_ROOT=${VCPKG_INSTALLATION_ROOT}" >> "$GITHUB_ENV"
+
+      - name: Install SymEngine + deps via vcpkg manifest
+        # Reads android/vcpkg.json — same manifest as Windows. Resolves
+        # symengine[arb,flint,mpfr] against the chosen Android triplet.
+        # Expect the first run to take 30-50 min; cached runs are fast.
+        working-directory: android
+        run: |
+          "${VCPKG_ROOT}/vcpkg" install \
+            --triplet ${{ matrix.triplet }} \
+            --x-manifest-root="$PWD" \
+            --binarysource="clear;x-gha,readwrite"
+
+      - name: Configure (CMake, standalone)
+        # Pass both the vcpkg toolchain AND the Android-NDK chainload
+        # via VCPKG_TARGET_TRIPLET (which selects the NDK toolchain
+        # internally). ANDROID_ABI is set by the triplet file too.
+        run: |
+          cmake -S android -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-28 \
+            -DANDROID_NDK_HOME="${ANDROID_NDK_HOME}"
+
+      - name: Build
+        run: |
+          cmake --build build --parallel 4
+
+      - name: Inspect output
+        run: |
+          echo "--- build/ binaries ---"
+          find build -type f \( -name "*.so" -o -name "*.a" \) -exec ls -la {} \;
+          SO=$(find build -name "libsymbolic_math_bridge.so" | head -1)
+          if [ -n "$SO" ]; then
+            echo
+            echo "--- exported flutter_symengine_* symbols in $SO ---"
+            "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" \
+              --defined-only --extern-only "$SO" 2>/dev/null | grep flutter_symengine_ | head -20
+            echo
+            echo "--- size + arch ---"
+            ls -la "$SO"
+            file "$SO"
+          else
+            echo "::warning::no libsymbolic_math_bridge.so produced"
+          fi
+
+      - name: Upload plugin .so
+        uses: actions/upload-artifact@v4
+        with:
+          name: libsymbolic_math_bridge-android-${{ matrix.triplet }}
+          path: |
+            build/**/libsymbolic_math_bridge.so
+          if-no-files-found: warn

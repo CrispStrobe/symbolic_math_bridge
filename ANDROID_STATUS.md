@@ -1,20 +1,31 @@
-# Android — R132 scaffold
+# Android — R132 scaffold + vcpkg path
 
-**Status (2026-05-27): scaffold-only on branch `r132-android-scaffold`.
-Not merged to main. Not pinned by CrispCalc.**
+**Status (2026-05-27): scaffold + GHA workflow on branch
+`r132-android-scaffold`. Not merged to main. Not pinned by CrispCalc.
+First workflow run pending.**
 
-This branch lands the Flutter plugin's `android/` directory structure but
-does **not** ship the per-ABI native artifacts. A consumer that
-`flutter pub get`s against this branch and then runs `flutter build apk`
-will:
+This branch lands two paths to a working `libsymbolic_math_bridge.so`:
 
-- ✅ Build successfully (the Gradle module + CMakeLists + Kotlin glue all
-  assemble; the resulting `libsymbolic_math_bridge.so` carries the
-  Kotlin↔C glue + force-link symbol table but no actual SymEngine
-  implementation)
-- ❌ Resolve every `flutter_symengine_*` FFI call to an "unavailable"
-  fallback path at runtime (same behaviour as today's Linux / Windows
-  builds — CrispCalc's `EngineService` already handles this)
+1. **vcpkg path (preferred, GHA-driven)** — mirrors R131 (Windows). The
+   plugin's `android/CMakeLists.txt` calls `find_package(symengine
+   CONFIG)`; the `build-android.yml` workflow runs `vcpkg install
+   symengine[arb,flint,mpfr]` against the `arm64-android-release`
+   triplet on `ubuntu-latest` with the bundled Android NDK, then
+   builds the wrapper `.so` static-linked against everything. Single
+   `.so` per ABI, no hand-rolled NDK chain.
+
+2. **jniLibs fallback (hand-rolled NDK)** — if vcpkg's symengine port
+   wedges against an Android triplet for some reason, the same
+   CMakeLists can consume per-ABI prebuilt `.a` archives at
+   `src/main/jniLibs/<abi>/`. Same shape iOS/macOS use via
+   `.xcframework` bundles. The `math-stack-android-builder` sibling
+   repo (parallel to `math-stack-ios-builder`) would produce those
+   archives; scaffold script at `scripts/build_android.sh`.
+
+Whichever source resolves first wins. If neither is available, the
+`.so` still assembles (wrapper source compiled in) but FFI calls
+return errors — same degraded fallback as today's Linux / Windows
+builds.
 
 ## What this branch *does* ship
 

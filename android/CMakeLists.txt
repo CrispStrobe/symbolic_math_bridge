@@ -1,24 +1,26 @@
 # android/CMakeLists.txt
 #
-# R132 scaffold — assembles libsymbolic_math_bridge.so per ABI from the
-# prebuilt static archives produced by the math-stack-android-builder
-# sibling repo. Mirrors how iOS/macOS link the wrapper + SymEngine +
-# GMP/MPFR/MPC/FLINT through the .xcframework bundles, but produces a
-# single combined .so per ABI here.
+# Two paths to a working libsymbolic_math_bridge.so:
 #
-# Expected layout when the prebuilt artifacts land (set up by
-# scripts/build_android.sh):
+# 1. **vcpkg path (preferred, used by build-android.yml workflow)**:
+#    `find_package(symengine CONFIG)` resolves SymEngine + transitive
+#    deps (boost-math, mpir/gmp, mpfr, mpc, flint, arb) from a vcpkg
+#    install for the `arm64-android-release` (or x64-android, etc.)
+#    triplet. All static-linked into a single .so per ABI. Builds
+#    cleanly on ubuntu-latest with the NDK toolchain via vcpkg's
+#    CHAINLOAD mechanism. Mirrors the Windows pattern (R131).
 #
-#   src/main/jniLibs/<abi>/libgmp.a
-#   src/main/jniLibs/<abi>/libmpfr.a
-#   src/main/jniLibs/<abi>/libmpc.a
-#   src/main/jniLibs/<abi>/libflint.a
-#   src/main/jniLibs/<abi>/libsymengine.a
-#   src/main/jniLibs/<abi>/libsymengine_flutter_wrapper.a
+# 2. **jniLibs fallback (hand-rolled NDK path, math-stack-android-builder)**:
+#    Per-ABI prebuilt static archives at
+#    `src/main/jniLibs/<abi>/lib{gmp,mpfr,mpc,flint,symengine,symengine_flutter_wrapper}.a`.
+#    Same shape iOS/macOS use via `.xcframework` bundles. Useful for
+#    older NDKs or when vcpkg's symengine port wedges against a
+#    triplet for some reason.
 #
-# Until those exist, the build produces an empty libsymbolic_math_bridge.so
-# (just the force-link C source) and the wrapper symbols are missing.
-# Runtime FFI falls back to the "bridge unavailable" path.
+# If neither source is available, the .so still assembles (with the
+# wrapper source compiled in) but the SymEngine calls inside the
+# wrapper are unresolved at runtime — same degraded fallback as the
+# desktop Linux / Windows builds today.
 
 cmake_minimum_required(VERSION 3.18.1)
 project(symbolic_math_bridge LANGUAGES C CXX)
@@ -27,69 +29,81 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Path to the per-ABI prebuilt static archives.
-set(PREBUILT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}")
+# === Path 1: vcpkg ========================================================
 
-# === Prebuilt static archives ============================================
-#
-# Imported as IMPORTED targets so the linker pulls only what it needs from
-# each .a — except for libsymengine_flutter_wrapper which holds the 45
-# `flutter_symengine_*` entry points reached via dlsym only. Those need
-# --whole-archive to defeat dead-code elimination.
+find_package(symengine CONFIG QUIET)
+if(symengine_FOUND)
+    message(STATUS "symbolic_math_bridge: vcpkg's symengine port found, linking static")
+    set(BRIDGE_LINK_MODE "vcpkg")
+endif()
 
-foreach(lib IN ITEMS gmp mpfr mpc flint symengine symengine_flutter_wrapper)
-    if(EXISTS "${PREBUILT_DIR}/lib${lib}.a")
-        add_library(${lib} STATIC IMPORTED)
-        set_target_properties(${lib} PROPERTIES
-            IMPORTED_LOCATION "${PREBUILT_DIR}/lib${lib}.a")
-        message(STATUS "symbolic_math_bridge: found lib${lib}.a in ${PREBUILT_DIR}")
+# === Path 2: prebuilt jniLibs (fallback) ==================================
+
+if(NOT symengine_FOUND)
+    set(PREBUILT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}")
+    set(PREBUILT_ANY_FOUND OFF)
+    foreach(lib IN ITEMS gmp mpfr mpc flint symengine symengine_flutter_wrapper)
+        if(EXISTS "${PREBUILT_DIR}/lib${lib}.a")
+            add_library(${lib} STATIC IMPORTED)
+            set_target_properties(${lib} PROPERTIES
+                IMPORTED_LOCATION "${PREBUILT_DIR}/lib${lib}.a")
+            message(STATUS "symbolic_math_bridge: found prebuilt lib${lib}.a in ${PREBUILT_DIR}")
+            set(PREBUILT_ANY_FOUND ON)
+        endif()
+    endforeach()
+    if(PREBUILT_ANY_FOUND)
+        set(BRIDGE_LINK_MODE "jniLibs")
     else()
+        set(BRIDGE_LINK_MODE "none")
         message(WARNING
-            "symbolic_math_bridge: lib${lib}.a missing from ${PREBUILT_DIR}. "
-            "Run scripts/build_android.sh from math-stack-android-builder to "
-            "produce it. The .so will assemble without it, but the "
-            "flutter_symengine_* symbols will be unresolved.")
+            "symbolic_math_bridge: no vcpkg symengine + no prebuilt jniLibs in "
+            "${PREBUILT_DIR}. The .so will assemble but flutter_symengine_* "
+            "calls will return errors. To produce a usable .so, either:\n"
+            "  (a) install vcpkg + symengine[arb,flint,mpfr] for the chosen "
+            "      Android triplet and re-CMake with the vcpkg toolchain, or\n"
+            "  (b) run scripts/build_android.sh to populate the jniLibs dir.")
     endif()
-endforeach()
+endif()
 
-# === The combined .so ====================================================
-#
-# A single source file holding `force_all_math_symbols_linking` (the
-# Android equivalent of iOS's force_symbolic_math_stack_linking trick).
-# That symbol is called from the Kotlin plugin's plugin-registration entry
-# point so the linker keeps the wrapper symbols around even when the only
-# real references are dlsym/dart:ffi at runtime.
+# === The combined .so =====================================================
 
-add_library(symbolic_math_bridge SHARED
+set(BRIDGE_SOURCES
     src/main/cpp/force_link.c
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/flutter_symengine_wrapper.c"
 )
+
+add_library(symbolic_math_bridge SHARED ${BRIDGE_SOURCES})
 
 target_include_directories(symbolic_math_bridge PRIVATE
     src/main/cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
 )
 
-# --whole-archive the wrapper static lib so its 45 entry points survive
-# the linker's dead-code pass. The other libs (gmp/mpfr/mpc/flint/symengine)
-# can be normal --no-whole-archive — only the symbols actually referenced
-# by the wrapper get pulled in, keeping the .so size down.
-if(TARGET symengine_flutter_wrapper)
-    target_link_libraries(symbolic_math_bridge
-        -Wl,--whole-archive
-        symengine_flutter_wrapper
-        -Wl,--no-whole-archive
-        symengine
-        flint
-        mpc
-        mpfr
-        gmp
-    )
-else()
-    message(WARNING
-        "symbolic_math_bridge: no prebuilt wrapper — building empty .so. "
-        "Runtime FFI calls will fail with 'symbol not found', and the "
-        "bridge falls back to the same unavailable path Linux/Windows take.")
+# Linker dependencies depend on which path resolved SymEngine.
+if(BRIDGE_LINK_MODE STREQUAL "vcpkg")
+    # vcpkg's exported `symengine` IMPORTED target handles transitive
+    # boost/mpir/mpfr/mpc/flint/arb deps via INTERFACE_LINK_LIBRARIES.
+    target_link_libraries(symbolic_math_bridge PRIVATE symengine)
+elseif(BRIDGE_LINK_MODE STREQUAL "jniLibs")
+    # Per-iOS pattern: --whole-archive the wrapper archive only, normal
+    # link for the rest so dead-code stripping works on SymEngine's
+    # vast symbol table.
+    set(LINK_LIBS "")
+    if(TARGET symengine_flutter_wrapper)
+        list(APPEND LINK_LIBS
+            -Wl,--whole-archive
+            symengine_flutter_wrapper
+            -Wl,--no-whole-archive)
+    endif()
+    foreach(lib IN ITEMS symengine flint mpc mpfr gmp)
+        if(TARGET ${lib})
+            list(APPEND LINK_LIBS ${lib})
+        endif()
+    endforeach()
+    target_link_libraries(symbolic_math_bridge PRIVATE ${LINK_LIBS})
 endif()
 
-# Android-specific: the NDK ships its own libm + libc; nothing extra needed.
-# C++ stdlib comes from c++_static via the NDK toolchain default.
-target_link_libraries(symbolic_math_bridge log)
+# Android-specific: NDK ships its own libm + libc; only `log` extra.
+target_link_libraries(symbolic_math_bridge PRIVATE log)
+
+message(STATUS "symbolic_math_bridge: link mode = ${BRIDGE_LINK_MODE}")
