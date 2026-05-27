@@ -3,7 +3,6 @@
   "name": "symbolic-math-bridge-windows",
   "version-string": "0.1.0",
   "description": "Manifest for the Windows build of the symbolic_math_bridge plugin.",
-  "_note_baseline": "no builtin-baseline pin — the windows-latest runner's bundled vcpkg is older than the ref Android uses; adding a pin caused 'failed to git show versions/baseline.json'. Re-add when we want strict reproducibility (and pair it with a `git -C C:\\vcpkg fetch origin master` step in the workflow).",
   "dependencies": [
     {
       "name": "symengine",
