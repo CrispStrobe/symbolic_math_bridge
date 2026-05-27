@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "symbolic-math-bridge-windows",
+  "version-string": "0.1.0",
+  "description": "Manifest for the Windows build of the symbolic_math_bridge plugin.",
+  "dependencies": [
+    {
+      "name": "symengine",
+      "features": ["arb", "flint", "mpfr"]
+    }
+  ]
+}

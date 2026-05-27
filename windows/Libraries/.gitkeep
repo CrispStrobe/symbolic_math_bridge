@@ -1,0 +1,5 @@
+Reserved for any prebuilt static archives that should ship in the
+plugin AAR/DLL when vcpkg-installed libs aren't available at build
+time. The build_windows GHA workflow normally resolves everything via
+vcpkg at CMake configure time, so this directory stays empty in the
+common case.
