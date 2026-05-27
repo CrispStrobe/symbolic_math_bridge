@@ -45,15 +45,17 @@ set(CMAKE_C_STANDARD 11)
 
 # === Locate SymEngine (resolved via vcpkg) ==============================
 
-find_package(symengine CONFIG QUIET)
-if(NOT symengine_FOUND)
+find_package(SymEngine CONFIG QUIET)
+if(NOT SymEngine_FOUND)
     message(WARNING
-        "symbolic_math_bridge (windows): vcpkg's symengine port not found. "
+        "symbolic_math_bridge (windows): vcpkg's SymEngine port not found. "
         "Falling back to a wrapper-only DLL — FFI calls will fail at "
         "runtime (the wrapper's SymEngine calls are unresolved). "
-        "To produce a usable DLL, install vcpkg + the symengine port "
+        "To produce a usable DLL, install vcpkg + the SymEngine port "
         "and pass -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/"
         "vcpkg.cmake to CMake. See WINDOWS_STATUS.md.")
+else()
+    message(STATUS "symbolic_math_bridge: SymEngine found, includes=${SYMENGINE_INCLUDE_DIRS}")
 endif()
 
 # === Source list =========================================================
@@ -91,8 +93,16 @@ if(NOT FLUTTER_PLUGIN_STANDALONE)
     target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 endif()
 
-if(symengine_FOUND)
-    target_link_libraries(${PLUGIN_NAME} PRIVATE symengine)
+if(SymEngine_FOUND)
+    # SymEngine's CMake config exposes legacy variable-style exports
+    # (SYMENGINE_INCLUDE_DIRS + SYMENGINE_LIBRARIES), not a fully-baked
+    # IMPORTED target. Apply both manually so the vendored
+    # flutter_symengine_wrapper.c can #include <symengine/cwrapper.h>
+    # and link against the static archives vcpkg laid down.
+    target_include_directories(${PLUGIN_NAME} PRIVATE
+        ${SYMENGINE_INCLUDE_DIRS})
+    target_link_libraries(${PLUGIN_NAME} PRIVATE
+        ${SYMENGINE_LIBRARIES})
 endif()
 
 # MSVC dead-code-stripping defeat. /INCLUDE: tells the linker to keep
