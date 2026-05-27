@@ -1,0 +1,85 @@
+// android/build.gradle
+//
+// Flutter plugin Gradle module for symbolic_math_bridge Android target.
+// R132 scaffold — wires the CMakeLists external native build into the AAR
+// Flutter packages for the host app. Per-ABI static-archive-linked .so
+// artifacts land in android/src/main/jniLibs/<abi>/ before AAR assembly,
+// produced by `scripts/build_android.sh` from the math-stack-android-builder
+// sibling repo (parallel to math-stack-ios-builder).
+//
+// Until the cross-compile chain (GMP → MPFR → MPC → FLINT → SymEngine →
+// wrapper) lands, this module assembles successfully but the wrapper .so
+// will be missing — runtime FFI symbol lookup falls back to the
+// already-handled "bridge unavailable" path (same as the desktop builds
+// on Linux / Windows today).
+
+group 'be.crispstro.symbolic_math_bridge'
+version '1.0.15-android-scaffold'
+
+buildscript {
+    ext.kotlin_version = '1.9.22'
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'be.crispstro.symbolic_math_bridge'
+    compileSdk 34
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+        main.jniLibs.srcDirs += 'src/main/jniLibs'
+    }
+
+    defaultConfig {
+        minSdk 21
+        ndk {
+            // Three ABIs we target. armeabi-v7a is optional — included
+            // here for older devices but the build script can drop it
+            // to halve build time on CI when not needed.
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'CMakeLists.txt'
+            // NDK 27 is the modern stable; the build script and CMakeLists
+            // are tested against it. Earlier NDKs (25, 26) should also
+            // work but YMMV on FLINT's autotools quirks.
+        }
+    }
+
+    // Don't try to strip — the wrapper symbols are dlsym-only and the
+    // strip pass would drop them. Same logic as the iOS -all_load
+    // workaround.
+    packagingOptions {
+        doNotStrip '**/libsymbolic_math_bridge.so'
+    }
+}

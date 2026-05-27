@@ -1,6 +1,6 @@
 name: symbolic_math_bridge
 description: "A Flutter plugin providing a high-performance FFI bridge to the SymEngine symbolic math stack."
-version: 1.0.15-windows-vcpkg-scaffold
+version: 1.1.0
 homepage:
 
 environment:
@@ -28,12 +28,20 @@ flutter:
       macos:
         pluginClass: SwiftSymbolicMathBridgePlugin
         ffiPlugin: true
-      # R131 scaffold (2026-05-27). Windows plugin module builds via
-      # vcpkg-resolved SymEngine + deps on MSVC. CMakeLists falls back
-      # gracefully (empty plugin DLL → bridge unavailable) when vcpkg's
-      # symengine port can't be found; the build_windows GHA workflow
-      # produces a real DLL by setting CMAKE_TOOLCHAIN_FILE to vcpkg's
-      # toolchain file. See WINDOWS_STATUS.md.
+      # R131 (2026-05-27): Windows MinGW64 build. libsymbolic_math_bridge_plugin.dll
+      # shipped at windows/Libraries/, produced by build-windows.yml via
+      # MSYS2/MinGW64 + source-built SymEngine 0.14.0 (cached). 5.7 MB stripped,
+      # PE32+ x86_64, plain C ABI loadable from MSVC-built Flutter Windows apps.
       windows:
         pluginClass: SymbolicMathBridgePluginCApi
+        ffiPlugin: true
+      # R132 (2026-05-27): Android arm64-v8a build. libsymbolic_math_bridge.so
+      # shipped at android/src/main/jniLibs/arm64-v8a/, produced by build-android.yml
+      # via vcpkg + NDK cross-compile (VCPKG_CHAINLOAD_TOOLCHAIN_FILE pattern).
+      # 17 MB stripped ELF, statically links SymEngine + FLINT + MPFR + MPC + GMP.
+      # x86_64 + armeabi-v7a ABIs not yet built — extend the workflow matrix when
+      # there's demand.
+      android:
+        package: be.crispstro.symbolic_math_bridge
+        pluginClass: SymbolicMathBridgePlugin
         ffiPlugin: true

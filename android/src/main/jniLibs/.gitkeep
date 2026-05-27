@@ -1,0 +1,10 @@
+Per-ABI prebuilt static archives land here before AAR assembly:
+
+  arm64-v8a/libgmp.a libmpfr.a libmpc.a libflint.a libsymengine.a libsymengine_flutter_wrapper.a
+  armeabi-v7a/...
+  x86_64/...
+
+Produced by scripts/build_android.sh from the math-stack-android-builder
+sibling repo. Until those files land, the build still completes but the
+runtime FFI calls into flutter_symengine_* fall back to the same
+"bridge unavailable" path the desktop Linux / Windows builds take today.
