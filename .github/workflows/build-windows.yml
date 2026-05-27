@@ -135,8 +135,10 @@ jobs:
           cmake --build build --parallel
 
       - name: Inspect + strip
+        # No `set -e` here. The strip + symbol inspection are
+        # informational; a grep miss returning exit 1 shouldn't tank
+        # the whole step (and thereby skip the artifact upload below).
         run: |
-          set -e
           DLL=$(find build -name "symbolic_math_bridge_plugin.dll" | head -1)
           if [ -z "$DLL" ]; then
             echo "::warning::no symbolic_math_bridge_plugin.dll produced"
@@ -145,13 +147,20 @@ jobs:
           fi
           echo "--- pre-strip ---"
           ls -la "$DLL"
-          /mingw64/bin/strip --strip-all "$DLL"
+          /mingw64/bin/strip --strip-all "$DLL" || true
           echo "--- post-strip ---"
           ls -la "$DLL"
           file "$DLL"
           echo
-          echo "--- exported flutter_symengine_* symbols ---"
-          /mingw64/bin/nm --defined-only --extern-only "$DLL" 2>/dev/null | grep flutter_symengine_ | head -20
+          echo "--- exported flutter_symengine_* symbols (from DLL export table via objdump) ---"
+          # MinGW's `nm` lists internal symbols including non-exported
+          # ones. To see what's actually in the .dll's EXPORT TABLE
+          # (i.e. callable via dlsym / GetProcAddress), use objdump -p
+          # which shows the [Ordinal/Name Pointer] table specifically.
+          /mingw64/bin/objdump -p "$DLL" 2>/dev/null | awk '/^.Export Tables.|.Name Pointer Table./{f=1;next} f && /^[[:space:]]*\[/{print $0}' | grep -i flutter_symengine | head -20 || true
+          echo
+          echo "--- (or via nm) ---"
+          /mingw64/bin/nm --defined-only --extern-only "$DLL" 2>/dev/null | grep flutter_symengine_ | head -10 || true
 
       - name: Upload plugin DLL
         uses: actions/upload-artifact@v4
