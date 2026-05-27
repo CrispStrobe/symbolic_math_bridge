@@ -129,6 +129,11 @@ endif()
 # the header; deferred until the symbol set stabilizes).
 if(MINGW)
     set_target_properties(${PLUGIN_NAME} PROPERTIES
+        # MinGW auto-prefixes shared libraries with "lib" by default
+        # (libsymbolic_math_bridge_plugin.dll). Flutter Windows / our
+        # workflow expects symbolic_math_bridge_plugin.dll. Drop the
+        # prefix so the output filename matches the target name.
+        PREFIX ""
         LINK_FLAGS "-Wl,--export-all-symbols")
 endif()
 
