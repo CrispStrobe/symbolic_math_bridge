@@ -1,32 +1,38 @@
 // windows/symbolic_math_bridge_plugin.cpp
 //
-// Flutter Windows plugin glue. ffiPlugin: true keeps this minimal —
-// the real work happens via `dart:ffi`
-// `DynamicLibrary.open('symbolic_math_bridge_plugin.dll')` reaching
-// the `flutter_symengine_*` C entry points compiled into the same DLL
-// from `../src/flutter_symengine_wrapper.c`.
+// Flutter Windows plugin glue. `ffiPlugin: true` keeps this minimal —
+// the real `flutter_symengine_*` symbols live either in this same DLL
+// (CI standalone build) or in a side-loaded `libsymbolic_math_bridge.dll`
+// (consumer build with bundled prebuilt), and are reached from Dart via
+// `DynamicLibrary.open(...)` rather than a method channel.
 
 #include "include/symbolic_math_bridge/symbolic_math_bridge_plugin_c_api.h"
 
 #include <flutter/plugin_registrar_windows.h>
 
+// SYMBOLIC_MATH_BRIDGE_HAS_FORCE_LINK is defined by CMakeLists in the
+// build modes that compile force_link.c alongside this file. The
+// force-link function takes the address of every flutter_symengine_*
+// symbol so the linker can't dead-code-strip them when the only
+// references are runtime dlsym/FFI lookups. In consumer-prebuilt mode
+// force_link.c is NOT compiled (the wrapper symbols live in the
+// bundled DLL, separately loaded by Dart) so the call would be
+// unresolved at link time. Compile the call out in that mode.
+#ifdef SYMBOLIC_MATH_BRIDGE_HAS_FORCE_LINK
 extern "C" {
-// Declared in force_link.c. Calling it from Register pins the wrapper
-// symbol addresses so the linker can't dead-code-strip them when the
-// only references are runtime dlsym/FFI lookups.
 int symbolic_math_bridge_force_link_symbols(void);
 }
+#endif
 
 namespace {
 
 class SymbolicMathBridgePlugin {
  public:
   static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar) {
-    // No method channel — this is a pure FFI plugin. Calling the
-    // force-link function here is the equivalent of iOS's
-    // force_all_math_symbols_linking() in the Swift plugin's
-    // register(with:) entry point.
+#ifdef SYMBOLIC_MATH_BRIDGE_HAS_FORCE_LINK
     (void)symbolic_math_bridge_force_link_symbols();
+#endif
+    // No method channel registration — pure FFI plugin.
   }
 };
 

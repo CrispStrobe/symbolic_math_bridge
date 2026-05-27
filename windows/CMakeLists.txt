@@ -104,6 +104,14 @@ if(NOT FLUTTER_PLUGIN_STANDALONE)
 endif()
 
 if(BRIDGE_BUILD_MODE STREQUAL "full-from-source")
+    # force_link.c gets compiled in this mode (see PLUGIN_SOURCES
+    # above). Tell symbolic_math_bridge_plugin.cpp it can call
+    # symbolic_math_bridge_force_link_symbols(); without this define
+    # that call compiles out (avoids link-time unresolved-extern in
+    # the registrar-stub / consumer modes).
+    target_compile_definitions(${PLUGIN_NAME} PRIVATE
+        SYMBOLIC_MATH_BRIDGE_HAS_FORCE_LINK)
+
     target_include_directories(${PLUGIN_NAME} PRIVATE
         ${SYMENGINE_INCLUDE_DIRS})
     target_link_libraries(${PLUGIN_NAME} PRIVATE
