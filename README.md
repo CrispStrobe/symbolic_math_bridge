@@ -1,17 +1,27 @@
 # symbolic_math_bridge
 
 [![pub package](https://img.shields.io/badge/Flutter-Plugin-blue)](https://flutter.dev/to/develop-plugins)
-[![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20Android%E2%9D%A8-lightgrey)](https://flutter.dev)
+[![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20Android%20%7C%20Windows-lightgrey)](https://flutter.dev)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
 
 A comprehensive Flutter plugin providing unified `dart:ffi` access to a powerful mathematical computing stack. This plugin integrates **GMP, MPFR, MPC, FLINT, and SymEngine** libraries, offering both high-level symbolic computation and direct, low-level access to each library's core functions.
 
-> **Platform status**: full support on **iOS** and **macOS**. **Android**
-> support is scaffolded on branch `r132-android-scaffold` — Gradle module,
-> CMakeLists, and Kotlin plugin glue are in place, but the per-ABI
-> prebuilt native archives haven't been produced yet. See
-> [`ANDROID_STATUS.md`](ANDROID_STATUS.md) for the roadmap. Linux and
-> Windows builds are tracked in the host app's PLAN P11.
+> **Platform status (v1.1.0):** full SymEngine on **iOS, macOS,
+> Android (arm64-v8a), Windows (x86_64)**. CI workflows produce the
+> native artifacts:
+>
+> | Platform | Artifact | Built by |
+> |---|---|---|
+> | iOS, macOS | `.xcframework` bundles under `ios/` | `math-stack-ios-builder` (separate repo) |
+> | Android arm64-v8a | `android/src/main/jniLibs/arm64-v8a/libsymbolic_math_bridge.so` | `.github/workflows/build-android.yml` (vcpkg + NDK cross-compile) |
+> | Windows x86_64 | `windows/Libraries/symbolic_math_bridge_plugin.dll` | `.github/workflows/build-windows.yml` (MSYS2/MinGW64 + source-built SymEngine) |
+>
+> See [`ANDROID_STATUS.md`](ANDROID_STATUS.md) +
+> [`WINDOWS_STATUS.md`](WINDOWS_STATUS.md) for the per-platform
+> iteration logs. Linux is not yet built (tracked as PLAN P11 R130 in
+> the CrispCalc host repo). Android `x86_64` (emulator) and
+> `armeabi-v7a` (32-bit phones) ABIs deferred — extend the workflow
+> matrix when needed.
 
 ## Features
 
