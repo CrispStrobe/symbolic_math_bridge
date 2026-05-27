@@ -1,0 +1,170 @@
+name: Build Windows (MSYS2 + MinGW64)
+
+# R131 (Windows via MSYS2 + MinGW64 + source-built SymEngine).
+#
+# Pivot from the original vcpkg+MSVC approach (windows-latest +
+# vcpkg install symengine[flint,mpfr]) which hit the GHA 6-hour
+# Windows runner cap during cold-cache install of the heavy
+# template-heavy C++ deps. Iteration recap in WINDOWS_STATUS.md.
+#
+# This workflow uses MSYS2's MinGW64 subsystem instead:
+#   - flint, mpfr, gmp, mpc are pacman-installed pre-built (~30 sec)
+#   - symengine isn't in MSYS2 repos, so we build from source via
+#     CMake + ninja (~5-15 min on MinGW vs hours on MSVC)
+#   - wrapper DLL static-links MinGW runtime so consumers don't
+#     need libgcc_s_seh / libwinpthread / libstdc++-6 alongside
+#
+# Expected end-to-end: 15-25 min cold, ~5 min cached.
+
+on:
+  push:
+    branches:
+      - 'r131-*'
+      - 'main'
+    paths:
+      - '.github/workflows/build-windows.yml'
+      - 'windows/**'
+      - 'src/**'
+      - 'pubspec.yaml'
+  workflow_dispatch:
+
+# Cancel any in-progress run on the same branch when a new push arrives.
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SYMENGINE_VERSION: "0.14.0"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60   # generous safety net; expect ~20 min
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 + MinGW64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            curl
+            tar
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-mpfr
+            mingw-w64-x86_64-mpc
+            mingw-w64-x86_64-flint
+            mingw-w64-x86_64-boost
+
+      - name: Cache built SymEngine
+        id: cache-symengine
+        uses: actions/cache@v4
+        with:
+          path: |
+            /mingw64/lib/libsymengine.a
+            /mingw64/include/symengine
+            /mingw64/lib/cmake/symengine
+          key: symengine-${{ env.SYMENGINE_VERSION }}-mingw64-${{ hashFiles('.github/workflows/build-windows.yml') }}
+
+      - name: Download + build SymEngine from source
+        if: steps.cache-symengine.outputs.cache-hit != 'true'
+        # SymEngine isn't in MSYS2 repos. Download + compile from
+        # source. CMake + ninja under MinGW takes ~5-15 min cold;
+        # subsequent runs hit the actions/cache@v4 above and skip
+        # this entire step.
+        run: |
+          set -e
+          cd /tmp
+          curl -sL "https://github.com/symengine/symengine/releases/download/v${SYMENGINE_VERSION}/symengine-${SYMENGINE_VERSION}.tar.gz" -o symengine.tar.gz
+          tar -xzf symengine.tar.gz
+          cd symengine-${SYMENGINE_VERSION}
+          # Static build, no LLVM, no ARB. Install into /mingw64
+          # so find_package(SymEngine CONFIG) picks it up the same
+          # way it does the pacman-installed math libs.
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/mingw64 \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DWITH_MPFR=ON \
+            -DWITH_MPC=ON \
+            -DWITH_FLINT=ON \
+            -DWITH_LLVM=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCHMARKS=OFF \
+            -DINTEGER_CLASS=flint
+          cmake --build build --parallel
+          cmake --install build
+
+      - name: Configure (CMake, standalone)
+        # MinGW build via MSYS Makefiles generator. Static-link the
+        # MinGW runtime so the resulting DLL has no libgcc /
+        # libstdc++ / libwinpthread runtime dependency at load time
+        # (consumers don't need to ship those DLLs alongside).
+        #
+        # CMAKE_POLICY_VERSION_MINIMUM=3.5: SymEngine 0.14.0's
+        # generated SymEngineConfig.cmake uses cmake_minimum_required
+        # with a version too low for CMake 4.x to accept. The policy
+        # override tells CMake to treat anything older as 3.5 and
+        # configure anyway.
+        run: |
+          cmake -S windows -B build -G "MSYS Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DFLUTTER_PLUGIN_STANDALONE=ON \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_C_FLAGS="-static-libgcc" \
+            -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
+
+      - name: Build
+        run: |
+          cmake --build build --parallel
+
+      - name: Inspect + strip
+        # No `set -e` here. The strip + symbol inspection are
+        # informational; a grep miss returning exit 1 shouldn't tank
+        # the whole step (and thereby skip the artifact upload below).
+        run: |
+          DLL=$(find build -name "symbolic_math_bridge_plugin.dll" | head -1)
+          if [ -z "$DLL" ]; then
+            echo "::warning::no symbolic_math_bridge_plugin.dll produced"
+            find build -name "*.dll" -o -name "*.a" | head -10
+            exit 0
+          fi
+          echo "--- pre-strip ---"
+          ls -la "$DLL"
+          /mingw64/bin/strip --strip-all "$DLL" || true
+          echo "--- post-strip ---"
+          ls -la "$DLL"
+          file "$DLL"
+          echo
+          echo "--- exported flutter_symengine_* symbols (from DLL export table via objdump) ---"
+          # MinGW's `nm` lists internal symbols including non-exported
+          # ones. To see what's actually in the .dll's EXPORT TABLE
+          # (i.e. callable via dlsym / GetProcAddress), use objdump -p
+          # which shows the [Ordinal/Name Pointer] table specifically.
+          /mingw64/bin/objdump -p "$DLL" 2>/dev/null | awk '/^.Export Tables.|.Name Pointer Table./{f=1;next} f && /^[[:space:]]*\[/{print $0}' | grep -i flutter_symengine | head -20 || true
+          echo
+          echo "--- (or via nm) ---"
+          /mingw64/bin/nm --defined-only --extern-only "$DLL" 2>/dev/null | grep flutter_symengine_ | head -10 || true
+
+      - name: Upload plugin DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: symbolic_math_bridge_plugin-windows-x64
+          path: build/symbolic_math_bridge_plugin.dll
+          if-no-files-found: warn

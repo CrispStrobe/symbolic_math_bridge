@@ -1,6 +1,6 @@
 name: symbolic_math_bridge
 description: "A Flutter plugin providing a high-performance FFI bridge to the SymEngine symbolic math stack."
-version: 1.0.0
+version: 1.0.15-windows-vcpkg-scaffold
 homepage:
 
 environment:
@@ -27,4 +27,13 @@ flutter:
         ffiPlugin: true
       macos:
         pluginClass: SwiftSymbolicMathBridgePlugin
+        ffiPlugin: true
+      # R131 scaffold (2026-05-27). Windows plugin module builds via
+      # vcpkg-resolved SymEngine + deps on MSVC. CMakeLists falls back
+      # gracefully (empty plugin DLL → bridge unavailable) when vcpkg's
+      # symengine port can't be found; the build_windows GHA workflow
+      # produces a real DLL by setting CMAKE_TOOLCHAIN_FILE to vcpkg's
+      # toolchain file. See WINDOWS_STATUS.md.
+      windows:
+        pluginClass: SymbolicMathBridgePluginCApi
         ffiPlugin: true
