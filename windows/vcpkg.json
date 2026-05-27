@@ -7,7 +7,7 @@
     {
       "name": "symengine",
       "default-features": false,
-      "features": ["arb", "flint", "mpfr"]
+      "features": ["flint", "mpfr"]
     }
   ]
 }
