@@ -20,7 +20,19 @@
 // references are dropped by the linker (the function returns 0
 // since the addresses fold to constants).
 
+// jni.h is only available when the NDK sysroot is on the include
+// path — that's the case for the Gradle externalNativeBuild flow but
+// NOT for the vcpkg-driven standalone CMake CI build (vcpkg's Android
+// triplet sets the NDK toolchain but doesn't add jni.h to the include
+// search path, since cross-compiled C libraries don't usually need
+// it). Make the JNI binding conditional so both modes compile.
+#if defined(__has_include) && __has_include(<jni.h>)
 #include <jni.h>
+#define SYMBOLIC_MATH_BRIDGE_HAVE_JNI 1
+#else
+#define SYMBOLIC_MATH_BRIDGE_HAVE_JNI 0
+#endif
+
 #include <stddef.h>
 
 // === Core symbolic ops =================================================
@@ -81,15 +93,11 @@ extern int   flutter_symengine_matrix_set_element(void*, int, int, const char*);
 extern char* flutter_symengine_matrix_get_element(void*, int, int);
 extern char* flutter_symengine_matrix_to_string(void*);
 
-// JNI entry point — called from the Kotlin plugin on attach. The volatile
-// sink prevents the optimizer from realising all the address-taken
-// pointers are unused; without it -O2 happily folds the function down to
-// `return 0`.
-JNIEXPORT jint JNICALL
-Java_be_crispstro_symbolic_1math_1bridge_SymbolicMathBridgePlugin_forceLinkSymbols(
-    JNIEnv* env, jobject thiz)
-{
-    (void)env; (void)thiz;
+// Plain C entry point. Always present, regardless of whether the build
+// has access to jni.h. Takes addresses of every flutter_symengine_*
+// entry point through a volatile sink so the compiler can't constant-
+// fold them away and the linker can't dead-code-strip them.
+int symbolic_math_bridge_force_link_symbols(void) {
     volatile void* sink = NULL;
 
     sink = (void*)&flutter_symengine_evaluate;       (void)sink;
@@ -147,3 +155,17 @@ Java_be_crispstro_symbolic_1math_1bridge_SymbolicMathBridgePlugin_forceLinkSymbo
     // is unused; we just need a side-effect the compiler can't fold.
     return 1;
 }
+
+#if SYMBOLIC_MATH_BRIDGE_HAVE_JNI
+// JNI wrapper — only compiled when jni.h is reachable (i.e. inside
+// Gradle's externalNativeBuild flow with the NDK sysroot on the
+// include path). Lets the Kotlin plugin call into the force-link
+// function via `external fun forceLinkSymbols(): Int`.
+JNIEXPORT jint JNICALL
+Java_be_crispstro_symbolic_1math_1bridge_SymbolicMathBridgePlugin_forceLinkSymbols(
+    JNIEnv* env, jobject thiz)
+{
+    (void)env; (void)thiz;
+    return (jint)symbolic_math_bridge_force_link_symbols();
+}
+#endif

@@ -31,15 +31,20 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # === Path 1: vcpkg ========================================================
 
-find_package(symengine CONFIG QUIET)
-if(symengine_FOUND)
-    message(STATUS "symbolic_math_bridge: vcpkg's symengine port found, linking static")
+find_package(SymEngine CONFIG QUIET)
+if(SymEngine_FOUND)
+    message(STATUS "symbolic_math_bridge: vcpkg's SymEngine port found, linking static")
     set(BRIDGE_LINK_MODE "vcpkg")
+    # SymEngine's config exposes SYMENGINE_INCLUDE_DIRS + SYMENGINE_LIBRARIES,
+    # NOT a fully-baked INTERFACE target like modern Config packages would.
+    # Wire them onto the wrapper manually below.
+    message(STATUS "symbolic_math_bridge: SYMENGINE_INCLUDE_DIRS=${SYMENGINE_INCLUDE_DIRS}")
+    message(STATUS "symbolic_math_bridge: SYMENGINE_LIBRARIES=${SYMENGINE_LIBRARIES}")
 endif()
 
 # === Path 2: prebuilt jniLibs (fallback) ==================================
 
-if(NOT symengine_FOUND)
+if(NOT SymEngine_FOUND)
     set(PREBUILT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}")
     set(PREBUILT_ANY_FOUND OFF)
     foreach(lib IN ITEMS gmp mpfr mpc flint symengine symengine_flutter_wrapper)
@@ -81,9 +86,16 @@ target_include_directories(symbolic_math_bridge PRIVATE
 
 # Linker dependencies depend on which path resolved SymEngine.
 if(BRIDGE_LINK_MODE STREQUAL "vcpkg")
-    # vcpkg's exported `symengine` IMPORTED target handles transitive
-    # boost/mpir/mpfr/mpc/flint/arb deps via INTERFACE_LINK_LIBRARIES.
-    target_link_libraries(symbolic_math_bridge PRIVATE symengine)
+    # SymEngine's CMake config exposes SYMENGINE_INCLUDE_DIRS +
+    # SYMENGINE_LIBRARIES (legacy variable-style, not an IMPORTED
+    # target). Apply both to the wrapper target manually so the
+    # vendored flutter_symengine_wrapper.c can #include <symengine/
+    # cwrapper.h> and link against the static archives vcpkg laid
+    # down at vcpkg_installed/<triplet>/lib/.
+    target_include_directories(symbolic_math_bridge PRIVATE
+        ${SYMENGINE_INCLUDE_DIRS})
+    target_link_libraries(symbolic_math_bridge PRIVATE
+        ${SYMENGINE_LIBRARIES})
 elseif(BRIDGE_LINK_MODE STREQUAL "jniLibs")
     # Per-iOS pattern: --whole-archive the wrapper archive only, normal
     # link for the rest so dead-code stripping works on SymEngine's
