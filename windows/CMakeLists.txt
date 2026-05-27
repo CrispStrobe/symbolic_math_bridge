@@ -120,6 +120,18 @@ if(MSVC)
 /INCLUDE:flutter_symengine_free_string")
 endif()
 
+# MinGW: the wrapper has no `__declspec(dllexport)` decorations, so
+# without --export-all-symbols only what the linker can prove
+# referenced from outside the DLL gets exported. dart:ffi reaches
+# these symbols via GetProcAddress on the loaded DLL — they must be
+# in the export table. --export-all-symbols is the cheapest path
+# (alternative: thread an FLUTTER_SYMENGINE_EXPORT macro through
+# the header; deferred until the symbol set stabilizes).
+if(MINGW)
+    set_target_properties(${PLUGIN_NAME} PROPERTIES
+        LINK_FLAGS "-Wl,--export-all-symbols")
+endif()
+
 # List of absolute paths to libraries that should be bundled with the
 # plugin's runtime DLLs (Flutter convention). Static-linked into our DLL,
 # so empty. Only set PARENT_SCOPE when actually being included from a

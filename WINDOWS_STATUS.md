@@ -1,23 +1,65 @@
-# Windows — R131 scaffold (vcpkg + MSVC)
+# Windows — R131 pivot to MSYS2/MinGW64
 
-**Status (2026-05-27): scaffold + GHA workflow on branch
-`r131-windows-vcpkg`. Not merged to main. Not pinned by CrispCalc.
-First workflow run pending — expect 1-3 iterations of debugging
-before a clean DLL drops out.**
+**Status (2026-05-27): vcpkg+MSVC approach abandoned after 6 attempts
+hitting GHA's 6-hour Windows runner cap. Pivoted to MSYS2/MinGW64.
+Workflow rewrite on branch `r131-windows-vcpkg` (branch name kept
+even though we're no longer using vcpkg). First MinGW run pending.**
 
-## Strategy
+## Why we pivoted
 
-Mirror what CrispASR's `build.yml` does for Whisper.cpp on Windows:
-`windows-latest` GHA runner + MSVC toolchain + vcpkg for native deps,
-with the `x-gha` binary cache so subsequent runs after the initial
-~30-min vcpkg install land in ~5 min.
+The vcpkg+MSVC approach worked architecturally — it's the same path
+that produced Android #7 GREEN. Same vcpkg + same SymEngine port +
+same `default-features: false` workaround. But on Windows it lost
+to wall-clock time:
 
-The key win over the math-stack-android-builder approach is that
-**vcpkg already has an official `symengine` port** (Microsoft-maintained,
-SymEngine 0.14.0, supports `arb` + `flint` + `mpfr` features). No
-hand-rolled cross-compile chain needed; vcpkg's port-of-ports tree
-resolves boost-math, boost-random, mpir/gmp, mpfr, flint, arb
-automatically.
+| Run | Outcome | Where it died |
+|---|---|---|
+| W#1 | cancelled at 3h 39m | LLVM compile (default feature trap) |
+| W#2/3 | failed fast | builtin-baseline pin / schema |
+| W#4 | cancelled at 1h 20m | LLVM re-pulled via `arb` |
+| W#5 | cancelled by concurrency | superseded by W#6 |
+| **W#6** | **cancelled at 6h 0m 22s** | **vcpkg install hit the GHA 6h cap** |
+
+Even with LLVM disabled, cold-cache install of boost-math + flint +
+mpfr + gmp + symengine via MSVC on the free `windows-latest` runner
+(notoriously slow for template-heavy C++ libs) doesn't fit in 6
+hours. Without a single green run there's no x-gha binary cache to
+populate, so every run pays the full cold-cache tax.
+
+For comparison: the same vcpkg dep set built in 14 min on Android
+(`ubuntu-latest`, NDK cross-compile via vcpkg-chainload toolchain).
+Ubuntu's C++ compile throughput on the free runner is roughly 10×
+Windows's.
+
+## New strategy — MSYS2/MinGW64
+
+Skip vcpkg entirely on Windows. Use MSYS2's MinGW64 subsystem
+(installed via `msys2/setup-msys2@v2`):
+
+- **flint, mpfr, gmp, mpc** are pacman-installed pre-built from
+  MSYS2's `mingw-w64-x86_64-*` repository (~30 sec each).
+- **symengine** isn't in MSYS2 repos. Compile from source via
+  CMake+ninja under MinGW (~5-15 min, vs hours under MSVC). Cache
+  the build via `actions/cache@v4` keyed on the SymEngine version,
+  so subsequent runs skip the compile entirely.
+- **Wrapper DLL** static-links MinGW runtime (`-static-libgcc
+  -static-libstdc++`) so consumers don't need to ship
+  `libgcc_s_seh-1.dll` / `libwinpthread-1.dll` / `libstdc++-6.dll`
+  alongside.
+- **`-Wl,--export-all-symbols`** because the wrapper has no
+  `__declspec(dllexport)` decorations — without it MinGW's linker
+  only exports what's proven referenced from outside the DLL.
+
+Expected total: **15-25 min cold, ~5 min cached.**
+
+## Compatibility note
+
+The MinGW-built DLL exposes a plain C ABI (the
+`flutter_symengine_wrapper.c` surface). Flutter Windows is built
+with MSVC, but it loads the bridge via `dart:ffi`
+`DynamicLibrary.open()` at runtime — only the C calling convention
+matters for that path, not which compiler built the DLL. MinGW C
+DLLs are loadable from MSVC consumers without ABI gymnastics.
 
 ## What this branch ships
 
