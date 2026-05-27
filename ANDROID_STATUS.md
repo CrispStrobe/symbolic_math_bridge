@@ -1,14 +1,35 @@
-# Android — R132 GREEN (vcpkg + NDK chainload)
+# Android — R132 SHIPPED (vcpkg + NDK chainload)
 
-**Status (2026-05-27): build-android.yml passing on branch
-`r132-android-scaffold`. `libsymbolic_math_bridge.so` for
-`arm64-v8a` committed at `android/src/main/jniLibs/arm64-v8a/`
-(17 MB stripped). Not yet merged to main. Not yet pinned by
-CrispCalc.**
+**Status (2026-05-27): merged to `main` as v1.1.0 then v1.1.1.
+Pinned by CrispCalc v0.4.0 at bridge ref `931adcf`. APK delta
++17.7 MB matches the stripped `.so` size, confirming the binary
+actually ships in releases.**
 
-First successful run: `26513083096` — 14 min wall clock (vcpkg
-binary cache populated by earlier iteration runs). All 40+
-`flutter_symengine_*` symbols defined and exported in the .so.
+First successful build-android.yml run: `26513083096` — 14 min
+wall clock. All 40+ `flutter_symengine_*` symbols defined and
+exported in the .so.
+
+## v1.1.1 consumer-integration fix
+
+v1.1.0 shipped the binary correctly but the consumer's Gradle
+build (i.e. `flutter build apk` in a downstream Flutter app)
+failed: bridge's `android/build.gradle` had `externalNativeBuild
+{ cmake { path 'CMakeLists.txt' } }`, forcing consumer Gradle to
+invoke our CMake — which tries to compile
+`flutter_symengine_wrapper.c` against SymEngine headers that
+aren't on consumer machines.
+
+Fix in v1.1.1: dropped `externalNativeBuild`. For an
+`ffiPlugin: true` Android module, `jniLibs.srcDirs +=
+'src/main/jniLibs'` alone is sufficient — Flutter packages the
+per-ABI `.so` into the APK automatically. The CI workflow
+(`build-android.yml`) still invokes `android/CMakeLists.txt`
+directly (bypassing Gradle) to cross-compile the `.so` from
+source via vcpkg + NDK. That path is unchanged; only the
+consumer-side Gradle path is now CMake-free.
+
+Caught by CrispCalc CI's "Build Android" job on the 1.1.0 pin
+attempt; green after 1.1.1 + force_link guard.
 
 ## How we got here (iteration log)
 

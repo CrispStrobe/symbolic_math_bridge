@@ -1,15 +1,57 @@
-# Windows — R131 GREEN (MSYS2/MinGW64)
+# Windows — R131 SHIPPED (MSYS2/MinGW64 + consumer-prebuilt bundling)
 
-**Status (2026-05-27): build-windows.yml passing on branch
-`r131-windows-vcpkg` (branch name kept even though we abandoned
-vcpkg). `symbolic_math_bridge_plugin.dll` for x86-64 committed at
-`windows/Libraries/` (5.7 MB stripped, PE32+, all `flutter_symengine_*`
-symbols in DLL Export Table). Not yet merged to main. Not yet
-pinned by CrispCalc.**
+**Status (2026-05-27): merged to `main` as v1.1.0 then v1.1.1.
+Pinned by CrispCalc v0.4.0 at bridge ref `931adcf`. Windows zip
+delta +1.9 MB matches the stripped DLL compressed, confirming
+the binary actually ships in releases.**
 
-First successful run: `26535903971` — 4 min 28 sec wall clock. The
-preceding 3 MinGW iterations each cycled in ~5 min vs the 1-6 hours
-each vcpkg iteration burned.
+The committed binary now lives at
+`windows/Libraries/libsymbolic_math_bridge.dll` (was renamed from
+`symbolic_math_bridge_plugin.dll` to avoid a filename collision
+with the registrar DLL Flutter's consumer-mode CMake build also
+produces). First successful build-windows.yml run: `26535903971`
+— 4 min 28 sec wall clock.
+
+## v1.1.1 consumer-integration fix
+
+v1.1.0 shipped the DLL correctly but the consumer's Flutter Windows
+build failed: bridge's `windows/CMakeLists.txt` always pulled
+`flutter_symengine_wrapper.c` into the consumer's build target,
+which fails to compile without SymEngine headers on the consumer
+machine.
+
+Fix in v1.1.1: **three-mode CMakeLists.txt**:
+
+| Mode | Detection | What gets compiled |
+|---|---|---|
+| `full-from-source` | `FLUTTER_PLUGIN_STANDALONE=ON` + `SymEngine_FOUND` | wrapper + force-link + registrar; the full DLL |
+| `consumer-prebuilt` | default + `windows/Libraries/libsymbolic_math_bridge.dll` exists | only the registrar from `symbolic_math_bridge_plugin.cpp`; bundles prebuilt DLL via `symbolic_math_bridge_bundled_libraries` |
+| `registrar-stub` | nothing found | registrar only; FFI calls return errors at runtime |
+
+CI workflow uses `full-from-source`. CrispCalc + any other consumer
+hits `consumer-prebuilt` automatically (the committed DLL is
+detected).
+
+Two Flutter Windows DLLs ship side-by-side in the consumer's
+runner output directory:
+- `symbolic_math_bridge_plugin.dll` — thin registrar built from
+  source on the consumer machine
+- `libsymbolic_math_bridge.dll` — the real wrapper, bundled
+  unchanged from `windows/Libraries/`
+
+Dart-side `DynamicLibrary.open('libsymbolic_math_bridge.dll')`
+loads the second; the first is just the Flutter plugin contract's
+registrar.
+
+One follow-up fix: `symbolic_math_bridge_plugin.cpp` still called
+`symbolic_math_bridge_force_link_symbols()` (defined in
+`force_link.c`) which consumer mode doesn't compile. Wrapped the
+call in `#ifdef SYMBOLIC_MATH_BRIDGE_HAS_FORCE_LINK`, defined
+only in `full-from-source` mode.
+
+Caught by CrispCalc CI's "Build Windows" job on the 1.1.0 pin
+attempt (LNK2019 unresolved external); green after 1.1.1 +
+force_link guard.
 
 ## Why we pivoted
 
