@@ -115,10 +115,17 @@ jobs:
         # MinGW runtime so the resulting DLL has no libgcc /
         # libstdc++ / libwinpthread runtime dependency at load time
         # (consumers don't need to ship those DLLs alongside).
+        #
+        # CMAKE_POLICY_VERSION_MINIMUM=3.5: SymEngine 0.14.0's
+        # generated SymEngineConfig.cmake uses cmake_minimum_required
+        # with a version too low for CMake 4.x to accept. The policy
+        # override tells CMake to treat anything older as 3.5 and
+        # configure anyway.
         run: |
           cmake -S windows -B build -G "MSYS Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
             -DFLUTTER_PLUGIN_STANDALONE=ON \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_C_FLAGS="-static-libgcc" \
             -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++" \
             -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
