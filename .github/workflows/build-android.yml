@@ -58,6 +58,15 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
+      - name: Install autotools (required by vcpkg's mpfr port)
+        # vcpkg's mpfr port runs autoreconf during configure and needs
+        # autoconf-archive + libtool which ubuntu-latest doesn't have
+        # pre-installed. windows-latest's MSYS2 tooling covers them
+        # there; on Linux we have to apt-install.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf autoconf-archive automake libtool
+
       - name: Locate Android NDK
         run: |
           # Runner ships multiple NDKs under $ANDROID_SDK_ROOT/ndk/.
