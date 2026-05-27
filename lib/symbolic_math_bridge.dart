@@ -292,12 +292,41 @@ class SymbolicMathBridge {
   bool _symEngineAvailable = false;
 
   SymbolicMathBridge._internal() {
-    _dylib = Platform.isIOS || Platform.isMacOS
-        ? DynamicLibrary.process()
-        : DynamicLibrary.open('libSymEngineFlutterWrapper.so');
-
+    _dylib = _openNativeLibrary();
     _initializeSymEngine();
     _initializeMatrixFinalizer();
+  }
+
+  /// Locate the per-platform native binary that holds the
+  /// `flutter_symengine_*` C entry points.
+  ///
+  /// - **iOS / macOS**: static-linked into the host process via the
+  ///   xcframework bundles. `DynamicLibrary.process()` reaches the
+  ///   symbols directly.
+  /// - **Android**: shipped at `android/src/main/jniLibs/<abi>/`
+  ///   as `libsymbolic_math_bridge.so`. Flutter packages it into
+  ///   the APK; `DynamicLibrary.open('libsymbolic_math_bridge.so')`
+  ///   loads it.
+  /// - **Windows**: shipped at `windows/Libraries/` as
+  ///   `symbolic_math_bridge_plugin.dll`. Flutter bundles it
+  ///   alongside the runner exe via the plugin's
+  ///   `<plugin>_bundled_libraries`. Loaded by filename.
+  /// - **Linux**: not yet built (P11 R130 in CrispCalc PLAN). Bridge
+  ///   falls through to its already-handled unavailable path when
+  ///   the open fails.
+  static DynamicLibrary _openNativeLibrary() {
+    if (Platform.isIOS || Platform.isMacOS) {
+      return DynamicLibrary.process();
+    }
+    if (Platform.isAndroid) {
+      return DynamicLibrary.open('libsymbolic_math_bridge.so');
+    }
+    if (Platform.isWindows) {
+      return DynamicLibrary.open('symbolic_math_bridge_plugin.dll');
+    }
+    // Linux + anything else: try a sensible default; the caller is
+    // expected to catch and surface the "bridge unavailable" path.
+    return DynamicLibrary.open('libsymbolic_math_bridge.so');
   }
 
   void _initializeMatrixFinalizer() {

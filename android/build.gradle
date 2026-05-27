@@ -1,20 +1,19 @@
 // android/build.gradle
 //
 // Flutter plugin Gradle module for symbolic_math_bridge Android target.
-// R132 scaffold — wires the CMakeLists external native build into the AAR
-// Flutter packages for the host app. Per-ABI static-archive-linked .so
-// artifacts land in android/src/main/jniLibs/<abi>/ before AAR assembly,
-// produced by `scripts/build_android.sh` from the math-stack-android-builder
-// sibling repo (parallel to math-stack-ios-builder).
+// Consumer-side mode: jniLibs only. The per-ABI .so artifacts shipped
+// at src/main/jniLibs/<abi>/ get packaged into the consumer APK
+// automatically — no CMake / externalNativeBuild needed in the
+// consumer build (consumer machines don't have SymEngine installed).
 //
-// Until the cross-compile chain (GMP → MPFR → MPC → FLINT → SymEngine →
-// wrapper) lands, this module assembles successfully but the wrapper .so
-// will be missing — runtime FFI symbol lookup falls back to the
-// already-handled "bridge unavailable" path (same as the desktop builds
-// on Linux / Windows today).
+// Bridge maintainer / CI mode: build-android.yml in .github/workflows/
+// invokes android/CMakeLists.txt directly (bypassing Gradle) to
+// cross-compile the .so from source via vcpkg + NDK. That's where the
+// SymEngine source build happens; the resulting .so lands in jniLibs/
+// and gets committed.
 
 group 'be.crispstro.symbolic_math_bridge'
-version '1.0.15-android-scaffold'
+version '1.1.1'
 
 buildscript {
     ext.kotlin_version = '1.9.22'
@@ -67,18 +66,17 @@ android {
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path 'CMakeLists.txt'
-            // NDK 27 is the modern stable; the build script and CMakeLists
-            // are tested against it. Earlier NDKs (25, 26) should also
-            // work but YMMV on FLINT's autotools quirks.
-        }
-    }
+    // No externalNativeBuild — the consumer's Gradle invocation should
+    // NOT try to compile the C wrapper from source (it'd need SymEngine
+    // installed, which consumer machines don't have). The .so is
+    // pre-built via build-android.yml and committed to jniLibs/. See
+    // ANDROID_STATUS.md for the build path.
 
     // Don't try to strip — the wrapper symbols are dlsym-only and the
     // strip pass would drop them. Same logic as the iOS -all_load
-    // workaround.
+    // workaround. (The .so we ship in jniLibs is already stripped
+    // via NDK's llvm-strip; this directive guards against any future
+    // re-strip pass Gradle might apply.)
     packagingOptions {
         doNotStrip '**/libsymbolic_math_bridge.so'
     }

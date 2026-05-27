@@ -1,3 +1,47 @@
+## 1.1.1 (2026-05-27)
+
+Consumer-integration fixes for v1.1.0's Android + Windows binaries.
+v1.1.0 shipped working binaries but the consumer-side wiring tried
+to compile from source in `flutter build` — which fails because
+consumer machines don't have SymEngine installed. This release
+restructures the plugin to use the pre-built binaries directly.
+
+* **Android `build.gradle`: dropped `externalNativeBuild`**. For an
+  `ffiPlugin: true` Android module, `jniLibs` alone is sufficient
+  to package the `.so` into the consumer's APK. The CI workflow
+  (`build-android.yml`) still invokes `android/CMakeLists.txt`
+  directly to cross-compile the `.so` from source — that path is
+  unchanged; only the consumer-side Gradle path is now CMake-free.
+* **Windows `CMakeLists.txt`: three build modes**:
+  - `FLUTTER_PLUGIN_STANDALONE=ON` + `SymEngine_FOUND` → build the
+    full wrapper from source (CI workflow only).
+  - Default consumer build with `windows/Libraries/libsymbolic_math_bridge.dll`
+    present → compile only the thin registrar from
+    `symbolic_math_bridge_plugin.cpp`; bundle the pre-built
+    `libsymbolic_math_bridge.dll` via
+    `symbolic_math_bridge_bundled_libraries`. No SymEngine
+    needed on the consumer machine.
+  - No `SymEngine` + no pre-built DLL → registrar-stub mode. The
+    plugin DLL still exists for Flutter's plugin contract; FFI
+    calls return errors (same as today's Linux degraded path).
+* **Renamed `windows/Libraries/symbolic_math_bridge_plugin.dll` →
+  `libsymbolic_math_bridge.dll`** to avoid a filename collision
+  with the registrar DLL Flutter's CMake builds in consumer mode.
+  The two DLLs ship side-by-side in the consumer's runner output
+  directory.
+* **Dart `symbolic_math_bridge.dart` — per-platform
+  `DynamicLibrary.open`**:
+  - iOS / macOS: `DynamicLibrary.process()` (static-linked)
+  - Android: `DynamicLibrary.open('libsymbolic_math_bridge.so')`
+  - Windows: `DynamicLibrary.open('libsymbolic_math_bridge.dll')`
+  - Linux (fallback): same as Android name; degraded gracefully
+    when the open fails.
+  Replaces the prior catch-all `libSymEngineFlutterWrapper.so`
+  which never matched our actual shipped binary names.
+* `build-windows.yml`: strip step now renames the built DLL to
+  `libsymbolic_math_bridge.dll` before artifact upload so the
+  artifact name matches what we commit to `windows/Libraries/`.
+
 ## 1.1.0 (2026-05-27)
 
 Full SymEngine bridge now works on **four** native platforms.

@@ -134,10 +134,17 @@ jobs:
         run: |
           cmake --build build --parallel
 
-      - name: Inspect + strip
+      - name: Inspect + strip + rename
         # No `set -e` here. The strip + symbol inspection are
         # informational; a grep miss returning exit 1 shouldn't tank
         # the whole step (and thereby skip the artifact upload below).
+        # Final rename: the standalone CI build produces
+        # symbolic_math_bridge_plugin.dll (matching the CMake target
+        # name), but for consumer-mode use we ship it as
+        # libsymbolic_math_bridge.dll — same convention as Android's
+        # libsymbolic_math_bridge.so. This avoids a name collision with
+        # the registrar-stub DLL Flutter's consumer-mode CMake build
+        # produces under the original name.
         run: |
           DLL=$(find build -name "symbolic_math_bridge_plugin.dll" | head -1)
           if [ -z "$DLL" ]; then
@@ -152,19 +159,17 @@ jobs:
           ls -la "$DLL"
           file "$DLL"
           echo
-          echo "--- exported flutter_symengine_* symbols (from DLL export table via objdump) ---"
-          # MinGW's `nm` lists internal symbols including non-exported
-          # ones. To see what's actually in the .dll's EXPORT TABLE
-          # (i.e. callable via dlsym / GetProcAddress), use objdump -p
-          # which shows the [Ordinal/Name Pointer] table specifically.
+          echo "--- exported flutter_symengine_* symbols ---"
           /mingw64/bin/objdump -p "$DLL" 2>/dev/null | awk '/^.Export Tables.|.Name Pointer Table./{f=1;next} f && /^[[:space:]]*\[/{print $0}' | grep -i flutter_symengine | head -20 || true
-          echo
-          echo "--- (or via nm) ---"
           /mingw64/bin/nm --defined-only --extern-only "$DLL" 2>/dev/null | grep flutter_symengine_ | head -10 || true
+          # Rename to the consumer-mode filename for the artifact upload.
+          RENAMED="$(dirname "$DLL")/libsymbolic_math_bridge.dll"
+          cp "$DLL" "$RENAMED"
+          ls -la "$RENAMED"
 
-      - name: Upload plugin DLL
+      - name: Upload plugin DLL (libsymbolic_math_bridge.dll)
         uses: actions/upload-artifact@v4
         with:
-          name: symbolic_math_bridge_plugin-windows-x64
-          path: build/symbolic_math_bridge_plugin.dll
+          name: libsymbolic_math_bridge-windows-x64
+          path: build/libsymbolic_math_bridge.dll
           if-no-files-found: warn
