@@ -1,9 +1,15 @@
-# Windows — R131 pivot to MSYS2/MinGW64
+# Windows — R131 GREEN (MSYS2/MinGW64)
 
-**Status (2026-05-27): vcpkg+MSVC approach abandoned after 6 attempts
-hitting GHA's 6-hour Windows runner cap. Pivoted to MSYS2/MinGW64.
-Workflow rewrite on branch `r131-windows-vcpkg` (branch name kept
-even though we're no longer using vcpkg). First MinGW run pending.**
+**Status (2026-05-27): build-windows.yml passing on branch
+`r131-windows-vcpkg` (branch name kept even though we abandoned
+vcpkg). `symbolic_math_bridge_plugin.dll` for x86-64 committed at
+`windows/Libraries/` (5.7 MB stripped, PE32+, all `flutter_symengine_*`
+symbols in DLL Export Table). Not yet merged to main. Not yet
+pinned by CrispCalc.**
+
+First successful run: `26535903971` — 4 min 28 sec wall clock. The
+preceding 3 MinGW iterations each cycled in ~5 min vs the 1-6 hours
+each vcpkg iteration burned.
 
 ## Why we pivoted
 
