@@ -3,9 +3,11 @@
   "name": "symbolic-math-bridge-android",
   "version-string": "0.1.0",
   "description": "Manifest for the Android build of the symbolic_math_bridge plugin.",
+  "builtin-baseline": "d015e31e90838a4c9dfa3eed45979bc70d9357fc",
   "dependencies": [
     {
       "name": "symengine",
+      "default-features": false,
       "features": ["arb", "flint", "mpfr"]
     }
   ]

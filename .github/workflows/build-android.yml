@@ -27,6 +27,12 @@ on:
       - 'pubspec.yaml'
   workflow_dispatch:
 
+# Cancel any in-progress run on the same branch when a new push arrives
+# (mirrors CrispASR build.yml's pattern).
+concurrency:
+  group: build-android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   actions: read   # for the x-gha vcpkg binary cache
