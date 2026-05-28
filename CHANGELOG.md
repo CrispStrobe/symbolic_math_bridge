@@ -1,3 +1,28 @@
+## 1.2.0 (2026-05-29)
+
+Linux x86_64 support (P11 R130). The last tier-1 platform — the
+bridge now ships full SymEngine on iOS / macOS / Android arm64-v8a /
+Windows x86_64 / **Linux x86_64**.
+
+* **`linux/` plugin** added. A hybrid of the Android and Windows
+  patterns: statically links the whole math stack (SymEngine + FLINT
+  + MPFR + MPC + GMP) into one `libsymbolic_math_bridge.so` like
+  Android, with three-mode `CMakeLists.txt` like Windows
+  (`full-from-source` for CI / `consumer-prebuilt` to bundle the
+  committed `.so` / `degraded` fallback). Simpler than Windows: a
+  Linux `ffiPlugin` needs no registrar `.cc` and no `flutter`
+  linkage, so the consumer path is pure bundling — and there's no
+  filename collision (Dart opens `libsymbolic_math_bridge.so`, which
+  is exactly what `add_library()` emits).
+* **`build-linux.yml`** workflow: vcpkg `x64-linux` (static) triplet
+  on `ubuntu-22.04`, pinned for a GLIBC 2.35 baseline. First green
+  run built an 18.3 MB stripped `.so` whose only dynamic deps are
+  libc / libstdc++ / libm / libgcc_s (verified via `ldd`), with all
+  `flutter_symengine_*` symbols in `.dynsym` and max referenced
+  symbol GLIBC_2.35.
+* **Committed binary** at `linux/Libraries/libsymbolic_math_bridge.so`.
+* **`pubspec.yaml`**: `linux: ffiPlugin: true`.
+
 ## 1.1.1 (2026-05-27)
 
 Consumer-integration fixes for v1.1.0's Android + Windows binaries.

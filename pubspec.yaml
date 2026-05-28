@@ -1,6 +1,6 @@
 name: symbolic_math_bridge
 description: "A Flutter plugin providing a high-performance FFI bridge to the SymEngine symbolic math stack."
-version: 1.1.1
+version: 1.2.0
 homepage:
 
 environment:
@@ -44,4 +44,12 @@ flutter:
       android:
         package: be.crispstro.symbolic_math_bridge
         pluginClass: SymbolicMathBridgePlugin
+        ffiPlugin: true
+      # R130 (2026-05-29): Linux x86_64 build. libsymbolic_math_bridge.so
+      # shipped at linux/Libraries/, produced by build-linux.yml via vcpkg's
+      # x64-linux (static) triplet on ubuntu-22.04 (GLIBC 2.35 baseline).
+      # Statically links SymEngine + FLINT + MPFR + MPC + GMP into one .so;
+      # only dynamic deps are libc/libstdc++/libm/libgcc_s. Pure ffiPlugin —
+      # no registrar class needed; Dart opens it by name.
+      linux:
         ffiPlugin: true
