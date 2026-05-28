@@ -1,9 +1,24 @@
-# Linux — R130 IN PROGRESS (vcpkg x64-linux static + consumer-prebuilt bundling)
+# Linux — R130 BUILD GREEN (vcpkg x64-linux static + consumer-prebuilt bundling)
 
-**Status (2026-05-29): scaffolding authored on branch `r130-linux`;
-CI iteration not yet green; binary not yet committed.** The last
-tier-1 platform. Closes the gap where desktop Linux falls through to
-the bridge-unavailable error path.
+**Status (2026-05-29): green on the FIRST CI run; binary committed;
+shipped as v1.2.0.** The last tier-1 platform. Closes the gap where
+desktop Linux fell through to the bridge-unavailable error path.
+
+First successful `build-linux.yml` run: `26604981909` — 19m5s wall
+clock (cold vcpkg compile of the whole math stack). The committed
+binary lives at `linux/Libraries/libsymbolic_math_bridge.so`
+(18.3 MB stripped). Verified in CI:
+
+- All `flutter_symengine_*` entry points exported in `.dynsym`
+  (survive `strip --strip-all`).
+- `ldd` shows only `libstdc++ / libm / libgcc_s / libc` + the loader
+  — the math stack is fully static-linked, as intended.
+- Max referenced versioned symbol is **GLIBC_2.35**, matching the
+  ubuntu-22.04 baseline (no drift past the pin).
+
+No iteration was needed — the Android+Windows lessons (drop `arb`,
+don't pin `builtin-baseline`, camelcase `find_package(SymEngine)`)
+transferred cleanly and configure/build/strip passed on attempt 1.
 
 ## Design — a hybrid of R132 (Android) and R131 (Windows)
 
@@ -48,7 +63,9 @@ Linux). Key choices:
 
 ## Iteration log
 
-- _(pending first CI run on `r130-linux`)_
+- **Run `26604981909` (attempt 1) — GREEN.** vcpkg install, CMake
+  configure (`full-from-source`), build, strip, symbol + ldd + GLIBC
+  checks all passed. `.so` uploaded and committed.
 
 ## Open risks to watch in CI
 

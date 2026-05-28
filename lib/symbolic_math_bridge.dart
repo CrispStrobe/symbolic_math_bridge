@@ -311,9 +311,11 @@ class SymbolicMathBridge {
   ///   `symbolic_math_bridge_plugin.dll`. Flutter bundles it
   ///   alongside the runner exe via the plugin's
   ///   `<plugin>_bundled_libraries`. Loaded by filename.
-  /// - **Linux**: not yet built (P11 R130 in CrispCalc PLAN). Bridge
-  ///   falls through to its already-handled unavailable path when
-  ///   the open fails.
+  /// - **Linux**: shipped at `linux/Libraries/` as
+  ///   `libsymbolic_math_bridge.so` (P11 R130, v1.2.0). Flutter
+  ///   bundles it alongside the app via the plugin's
+  ///   `<plugin>_bundled_libraries`; `DynamicLibrary.open` loads it by
+  ///   the same name `add_library()` emits.
   static DynamicLibrary _openNativeLibrary() {
     if (Platform.isIOS || Platform.isMacOS) {
       return DynamicLibrary.process();
