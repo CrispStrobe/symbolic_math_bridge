@@ -1,0 +1,140 @@
+name: Build Linux (vcpkg)
+
+# R130 (Linux x86_64 via vcpkg).
+#
+# Mirror of build-android.yml WITHOUT the NDK cross-compile — the
+# runner IS Linux, so vcpkg's host triplet (`x64-linux`, static)
+# builds SymEngine + transitive deps natively and CMake links them
+# into one libsymbolic_math_bridge.so. No VCPKG_CHAINLOAD_TOOLCHAIN_FILE
+# needed.
+#
+# Pinned to ubuntu-22.04 (GLIBC 2.35) rather than ubuntu-latest so the
+# committed .so runs on a sensible baseline of distros. The math stack
+# is static-linked; the only dynamic deps are libc / libstdc++ / libm /
+# libgcc_s, whose versioned symbols are what the GLIBC baseline governs.
+#
+# First-run vcpkg install is ~20-40 min cold (symengine + flint + mpfr
+# + mpc + gmp, all compiled). The x-gha binary cache makes subsequent
+# runs ~5-10 min.
+
+on:
+  push:
+    branches:
+      - 'r130-*'
+      - 'main'
+    paths:
+      - '.github/workflows/build-linux.yml'
+      - 'linux/**'
+      - 'src/**'
+      - 'pubspec.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: build-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read   # for the x-gha vcpkg binary cache
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        triplet: [x64-linux]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Export GHA cache env (for vcpkg x-gha)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Install autotools (required by vcpkg's mpfr port)
+        # vcpkg's mpfr port runs autoreconf during configure and needs
+        # autoconf-archive + libtool which the runner doesn't have
+        # pre-installed (same as build-android.yml).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf autoconf-archive automake libtool
+
+      - name: Use bundled vcpkg
+        run: |
+          if [ ! -x "${VCPKG_INSTALLATION_ROOT}/vcpkg" ]; then
+            echo "::error::vcpkg not at \$VCPKG_INSTALLATION_ROOT — runner image changed?"
+            exit 1
+          fi
+          echo "VCPKG_ROOT=${VCPKG_INSTALLATION_ROOT}" >> "$GITHUB_ENV"
+
+      - name: Install SymEngine + deps via vcpkg manifest
+        # Reads linux/vcpkg.json — symengine[flint,mpfr], no default
+        # features (drops the arb feature that transitively re-pulls
+        # LLVM, per the R131/R132 cross-cutting note).
+        working-directory: linux
+        run: |
+          "${VCPKG_ROOT}/vcpkg" install \
+            --triplet ${{ matrix.triplet }} \
+            --x-manifest-root="$PWD" \
+            --binarysource="clear;x-gha,readwrite"
+
+      - name: Configure (CMake, standalone)
+        run: |
+          cmake -S linux -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DFLUTTER_PLUGIN_STANDALONE=ON
+
+      - name: Build
+        run: |
+          cmake --build build --parallel 4
+
+      - name: Inspect + strip
+        # Strip before uploading. Unstripped output carries debug_info
+        # from every static-linked SymEngine / FLINT / MPFR / GMP
+        # archive (~100 MB+). Stripped is comparable to the Android .so
+        # (~17 MB). The flutter_symengine_* symbols ride in .dynsym, so
+        # strip --strip-all leaves them visible to dlsym.
+        run: |
+          set -e
+          echo "--- build/ binaries (pre-strip) ---"
+          find build -type f \( -name "*.so" -o -name "*.a" \) -exec ls -la {} \;
+          SO=$(find build -name "libsymbolic_math_bridge.so" | head -1)
+          if [ -z "$SO" ]; then
+            echo "::error::no libsymbolic_math_bridge.so produced"
+            exit 1
+          fi
+          echo
+          echo "--- pre-strip: exported flutter_symengine_* count ---"
+          nm --defined-only --extern-only --dynamic "$SO" 2>/dev/null | grep -c flutter_symengine_ || true
+          strip --strip-all "$SO"
+          echo
+          echo "--- post-strip ---"
+          ls -la "$SO"
+          file "$SO"
+          echo
+          echo "--- post-strip: flutter_symengine_* still exported ---"
+          nm --defined-only --extern-only --dynamic "$SO" 2>/dev/null | grep flutter_symengine_ | head -20
+          echo
+          echo "--- dynamic deps (ldd) — expect only libc/libstdc++/libm/libgcc_s ---"
+          ldd "$SO" || true
+          echo
+          echo "--- max GLIBC version referenced (baseline check) ---"
+          objdump -T "$SO" 2>/dev/null | grep -oE 'GLIBC_[0-9.]+' | sort -V -u | tail -5 || true
+
+      - name: Upload plugin .so
+        uses: actions/upload-artifact@v4
+        with:
+          name: libsymbolic_math_bridge-linux-${{ matrix.triplet }}
+          path: |
+            build/**/libsymbolic_math_bridge.so
+          if-no-files-found: warn

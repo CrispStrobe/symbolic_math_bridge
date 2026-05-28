@@ -1,0 +1,3 @@
+Placeholder so linux/Libraries/ exists in the checkout before CI
+commits the built libsymbolic_math_bridge.so here (R130, Linux).
+Mirrors windows/Libraries/.gitkeep.
