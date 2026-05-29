@@ -55,6 +55,7 @@ typedef _GetVersionC = Pointer<Utf8> Function();
 typedef _FactorialC = Pointer<Utf8> Function(Int32);
 typedef _FibonacciC = Pointer<Utf8> Function(Int32);
 typedef _EvalfPrecisionC = Pointer<Utf8> Function(Pointer<Utf8>, Int32);
+typedef _BesselC = Pointer<Utf8> Function(Int32, Pointer<Utf8>);
 
 // Matrix operations
 typedef _MatrixNewC = Pointer<Void> Function(Int32, Int32);
@@ -84,6 +85,7 @@ typedef _GetVersionDart = Pointer<Utf8> Function();
 typedef _FactorialDart = Pointer<Utf8> Function(int);
 typedef _FibonacciDart = Pointer<Utf8> Function(int);
 typedef _EvalfPrecisionDart = Pointer<Utf8> Function(Pointer<Utf8>, int);
+typedef _BesselDart = Pointer<Utf8> Function(int, Pointer<Utf8>);
 
 typedef _MatrixNewDart = Pointer<Void> Function(int, int);
 typedef _MatrixFreeDart = void Function(Pointer<Void>);
@@ -299,6 +301,10 @@ class SymbolicMathBridge {
 
   // Generic arbitrary-precision numeric evaluation of any expression.
   _EvalfPrecisionDart? _evalfWithPrecision;
+
+  // Bessel J/Y (integer order, real arg) via MPFR.
+  _BesselDart? _besselj;
+  _BesselDart? _bessely;
 
   // Round 89: number-theory primitives. Same string-in/string-out
   // signature as the existing unary functions.
@@ -573,6 +579,20 @@ class SymbolicMathBridge {
         );
       } catch (_) {
         _evalfWithPrecision = null;
+      }
+      try {
+        _besselj = _dylib.lookupFunction<_BesselC, _BesselDart>(
+          'flutter_symengine_besselj',
+        );
+      } catch (_) {
+        _besselj = null;
+      }
+      try {
+        _bessely = _dylib.lookupFunction<_BesselC, _BesselDart>(
+          'flutter_symengine_bessely',
+        );
+      } catch (_) {
+        _bessely = null;
       }
 
       // Round 89: number-theory primitives. Each lookup is in its
@@ -1222,6 +1242,43 @@ class SymbolicMathBridge {
       }
     } finally {
       malloc.free(exprC);
+    }
+  }
+
+  /// Bessel function of the first kind J_order(x), integer [order], real
+  /// [x], via MPFR's mpfr_jn. Returns a ~15-digit numeric string.
+  String mpfrBesselJ(int order, String x) => _bessel(_besselj, 'besselj', order, x);
+
+  /// Bessel function of the second kind Y_order(x), via mpfr_yn.
+  String mpfrBesselY(int order, String x) => _bessel(_bessely, 'bessely', order, x);
+
+  String _bessel(_BesselDart? fn, String op, int order, String x) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('MPFR $op');
+    }
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+        'flutter_symengine_$op (older bridge build — rebuild from '
+        'math-stack-ios-builder)',
+      );
+    }
+    final xC = x.toNativeUtf8();
+    try {
+      final resultC = fn(order, xC);
+      if (resultC == nullptr) {
+        throw SymbolicMathException(op, 'native returned null');
+      }
+      try {
+        final result = resultC.toDartString();
+        if (result.startsWith('Error in ')) {
+          throw SymbolicMathException(op, result);
+        }
+        return result;
+      } finally {
+        _freeString(resultC);
+      }
+    } finally {
+      malloc.free(xC);
     }
   }
 

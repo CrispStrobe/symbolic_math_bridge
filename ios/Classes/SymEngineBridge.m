@@ -48,6 +48,8 @@ extern char* flutter_symengine_e_with_precision(int decimal_digits);
 extern char* flutter_symengine_euler_gamma_with_precision(int decimal_digits);
 extern char* flutter_symengine_sqrt2_with_precision(int decimal_digits);
 extern char* flutter_symengine_evalf_with_precision(const char* expression, int decimal_digits);
+extern char* flutter_symengine_besselj(int order, const char* x_str);
+extern char* flutter_symengine_bessely(int order, const char* x_str);
 // Number-theory primitives (round 89)
 extern char* flutter_symengine_isprime(const char* n);
 extern char* flutter_symengine_nextprime(const char* n);
@@ -108,6 +110,9 @@ extern int mpfr_sqrt(void* rop, const void* op, int rnd);
 extern int mpfr_const_pi(void* rop, int rnd);
 extern int mpfr_sin(void* rop, const void* op, int rnd);
 extern int mpfr_cos(void* rop, const void* op, int rnd);
+extern int mpfr_jn(void* rop, long n, const void* op, int rnd); // bessel J
+extern int mpfr_yn(void* rop, long n, const void* op, int rnd); // bessel Y
+extern int mpfr_set_str(void* rop, const char* s, int base, int rnd);
 
 // MPC
 extern void mpc_init2(void* z, long prec);
@@ -192,6 +197,8 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         flutter_symengine_euler_gamma_with_precision,
         flutter_symengine_sqrt2_with_precision,
         flutter_symengine_evalf_with_precision,
+        flutter_symengine_besselj,
+        flutter_symengine_bessely,
         flutter_symengine_isprime,
         flutter_symengine_nextprime,
         flutter_symengine_prevprime,
@@ -212,7 +219,7 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         
         // === Core Symbols from Underlying Libraries (Exhaustive List) ===
         (void *)__gmpz_init, (void *)__gmpz_init_set_str, (void *)__gmpz_clear, (void *)__gmpz_get_str, (void *)__gmpz_set_ui, (void *)__gmpz_set_si, (void *)__gmpz_add, (void *)__gmpz_add_ui, (void *)__gmpz_sub, (void *)__gmpz_mul, (void *)__gmpz_mul_ui, (void *)__gmpz_pow_ui, (void *)__gmpz_gcd, (void *)__gmpz_cmp, (void *)__gmpz_cmp_ui, (void *)__gmpz_abs, (void *)__gmpz_neg, (void *)__gmpz_sqrt, (void *)__gmpz_fac_ui, (void *)__gmpz_powm, (void *)__gmpz_invert, (void *)__gmpz_jacobi,
-        (void *)mpfr_init2, (void *)mpfr_clear, (void *)mpfr_set_ui, (void *)mpfr_set_d, (void *)mpfr_get_str, (void *)mpfr_get_d, (void *)mpfr_add, (void *)mpfr_mul, (void *)mpfr_sqrt, (void *)mpfr_const_pi, (void *)mpfr_sin, (void *)mpfr_cos,
+        (void *)mpfr_init2, (void *)mpfr_clear, (void *)mpfr_set_ui, (void *)mpfr_set_d, (void *)mpfr_get_str, (void *)mpfr_get_d, (void *)mpfr_add, (void *)mpfr_mul, (void *)mpfr_sqrt, (void *)mpfr_const_pi, (void *)mpfr_sin, (void *)mpfr_cos, (void *)mpfr_jn, (void *)mpfr_yn, (void *)mpfr_set_str,
         (void *)mpc_init2, (void *)mpc_clear, (void *)mpc_set_ui_ui, (void *)mpc_get_str, (void *)mpc_add, (void *)mpc_mul, (void *)mpc_sqrt,
         (void *)fmpz_init, (void *)fmpz_clear, (void *)fmpz_set_ui, (void *)fmpz_get_str, (void *)fmpz_add, (void *)fmpz_mul, (void *)fmpz_pow_ui, (void *)fmpz_cmp, (void *)fmpz_abs, (void *)fmpz_fac_ui,
         (void *)fmpz_set_str, (void *)fmpz_sizeinbase, (void *)fmpz_is_zero, (void *)fmpz_is_one, (void *)fmpz_sgn, (void *)fmpz_neg, (void *)fmpz_factor_init, (void *)fmpz_factor_clear, (void *)fmpz_factor, (void *)fmpz_euler_phi
