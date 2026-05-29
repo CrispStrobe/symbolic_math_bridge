@@ -54,6 +54,7 @@ typedef _GetConstantC = Pointer<Utf8> Function();
 typedef _GetVersionC = Pointer<Utf8> Function();
 typedef _FactorialC = Pointer<Utf8> Function(Int32);
 typedef _FibonacciC = Pointer<Utf8> Function(Int32);
+typedef _EvalfPrecisionC = Pointer<Utf8> Function(Pointer<Utf8>, Int32);
 
 // Matrix operations
 typedef _MatrixNewC = Pointer<Void> Function(Int32, Int32);
@@ -82,6 +83,7 @@ typedef _GetConstantDart = Pointer<Utf8> Function();
 typedef _GetVersionDart = Pointer<Utf8> Function();
 typedef _FactorialDart = Pointer<Utf8> Function(int);
 typedef _FibonacciDart = Pointer<Utf8> Function(int);
+typedef _EvalfPrecisionDart = Pointer<Utf8> Function(Pointer<Utf8>, int);
 
 typedef _MatrixNewDart = Pointer<Void> Function(int, int);
 typedef _MatrixFreeDart = void Function(Pointer<Void>);
@@ -294,6 +296,9 @@ class SymbolicMathBridge {
   _FactorialDart? _eWithPrecision;
   _FactorialDart? _eulerGammaWithPrecision;
   _FactorialDart? _sqrt2WithPrecision;
+
+  // Generic arbitrary-precision numeric evaluation of any expression.
+  _EvalfPrecisionDart? _evalfWithPrecision;
 
   // Round 89: number-theory primitives. Same string-in/string-out
   // signature as the existing unary functions.
@@ -560,6 +565,14 @@ class SymbolicMathBridge {
             );
       } catch (_) {
         _sqrt2WithPrecision = null;
+      }
+      try {
+        _evalfWithPrecision =
+            _dylib.lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
+          'flutter_symengine_evalf_with_precision',
+        );
+      } catch (_) {
+        _evalfWithPrecision = null;
       }
 
       // Round 89: number-theory primitives. Each lookup is in its
@@ -1167,6 +1180,48 @@ class SymbolicMathBridge {
       return result;
     } finally {
       _freeString(resultC);
+    }
+  }
+
+  /// Generic arbitrary-precision numeric evaluation: evalf [expression]
+  /// to [precision] decimal digits via MPFR (real path). Backs the
+  /// calculator's `evalf(expr, N)`. Throws on a non-real result — the
+  /// high-precision complex (MPC) path is separate.
+  String mpfrEvalf(String expression, int precision) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('MPFR evalf');
+    }
+    final fn = _evalfWithPrecision;
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+        'flutter_symengine_evalf_with_precision (older bridge build — '
+        'rebuild from math-stack-ios-builder)',
+      );
+    }
+    if (precision < 1 || precision > 10000) {
+      throw SymbolicMathException(
+        'evalf_with_precision',
+        'precision must be in 1..10000 (got $precision)',
+      );
+    }
+    final exprC = expression.toNativeUtf8();
+    try {
+      final resultC = fn(exprC, precision);
+      if (resultC == nullptr) {
+        throw SymbolicMathException(
+            'evalf_with_precision', 'native returned null');
+      }
+      try {
+        final result = resultC.toDartString();
+        if (result.startsWith('Error in ')) {
+          throw SymbolicMathException('evalf_with_precision', result);
+        }
+        return result;
+      } finally {
+        _freeString(resultC);
+      }
+    } finally {
+      malloc.free(exprC);
     }
   }
 
