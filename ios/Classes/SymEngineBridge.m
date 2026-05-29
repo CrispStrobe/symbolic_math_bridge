@@ -52,6 +52,11 @@ extern char* flutter_symengine_isprime(const char* n);
 extern char* flutter_symengine_nextprime(const char* n);
 extern char* flutter_symengine_prevprime(const char* n);
 extern char* flutter_symengine_factorint(const char* n);
+// Modular arithmetic + multiplicative number theory (round 4 of the precision arc)
+extern char* flutter_symengine_modpow(const char* a, const char* e, const char* m);
+extern char* flutter_symengine_modinv(const char* a, const char* m);
+extern char* flutter_symengine_totient(const char* n);
+extern char* flutter_symengine_jacobi(const char* a, const char* n);
 // Matrix Functions
 extern void* flutter_symengine_matrix_new(int rows, int cols);
 extern void flutter_symengine_matrix_free(void* matrix);
@@ -84,6 +89,10 @@ extern void __gmpz_abs(void* rop, const void* op);
 extern void __gmpz_neg(void* rop, const void* op);
 extern void __gmpz_sqrt(void* rop, const void* op);
 extern void __gmpz_fac_ui(void* rop, unsigned long int n);
+// Round 4 (precision arc): modpow / modinv / jacobi reach these directly
+extern void __gmpz_powm(void* rop, const void* base, const void* exp, const void* mod);
+extern int __gmpz_invert(void* rop, const void* op1, const void* op2);
+extern int __gmpz_jacobi(const void* a, const void* b);
 
 // MPFR
 extern void mpfr_init2(void* x, long prec);
@@ -129,6 +138,7 @@ extern void fmpz_neg(void* f, const void* g);
 extern void fmpz_factor_init(void* f);
 extern void fmpz_factor_clear(void* f);
 extern void fmpz_factor(void* f, const void* n);
+extern void fmpz_euler_phi(void* res, const void* n); // round 4: totient
 extern void fmpz_abs(void* f1, const void* f2);
 extern void fmpz_fac_ui(void* f, unsigned long n);
 
@@ -184,6 +194,10 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         flutter_symengine_nextprime,
         flutter_symengine_prevprime,
         flutter_symengine_factorint,
+        flutter_symengine_modpow,
+        flutter_symengine_modinv,
+        flutter_symengine_totient,
+        flutter_symengine_jacobi,
         flutter_symengine_matrix_new,
         flutter_symengine_matrix_free,
         flutter_symengine_matrix_set_element,
@@ -195,11 +209,11 @@ extern void fmpz_fac_ui(void* f, unsigned long n);
         flutter_symengine_matrix_mul,
         
         // === Core Symbols from Underlying Libraries (Exhaustive List) ===
-        (void *)__gmpz_init, (void *)__gmpz_init_set_str, (void *)__gmpz_clear, (void *)__gmpz_get_str, (void *)__gmpz_set_ui, (void *)__gmpz_set_si, (void *)__gmpz_add, (void *)__gmpz_add_ui, (void *)__gmpz_sub, (void *)__gmpz_mul, (void *)__gmpz_mul_ui, (void *)__gmpz_pow_ui, (void *)__gmpz_gcd, (void *)__gmpz_cmp, (void *)__gmpz_cmp_ui, (void *)__gmpz_abs, (void *)__gmpz_neg, (void *)__gmpz_sqrt, (void *)__gmpz_fac_ui,
+        (void *)__gmpz_init, (void *)__gmpz_init_set_str, (void *)__gmpz_clear, (void *)__gmpz_get_str, (void *)__gmpz_set_ui, (void *)__gmpz_set_si, (void *)__gmpz_add, (void *)__gmpz_add_ui, (void *)__gmpz_sub, (void *)__gmpz_mul, (void *)__gmpz_mul_ui, (void *)__gmpz_pow_ui, (void *)__gmpz_gcd, (void *)__gmpz_cmp, (void *)__gmpz_cmp_ui, (void *)__gmpz_abs, (void *)__gmpz_neg, (void *)__gmpz_sqrt, (void *)__gmpz_fac_ui, (void *)__gmpz_powm, (void *)__gmpz_invert, (void *)__gmpz_jacobi,
         (void *)mpfr_init2, (void *)mpfr_clear, (void *)mpfr_set_ui, (void *)mpfr_set_d, (void *)mpfr_get_str, (void *)mpfr_get_d, (void *)mpfr_add, (void *)mpfr_mul, (void *)mpfr_sqrt, (void *)mpfr_const_pi, (void *)mpfr_sin, (void *)mpfr_cos,
         (void *)mpc_init2, (void *)mpc_clear, (void *)mpc_set_ui_ui, (void *)mpc_get_str, (void *)mpc_add, (void *)mpc_mul, (void *)mpc_sqrt,
         (void *)fmpz_init, (void *)fmpz_clear, (void *)fmpz_set_ui, (void *)fmpz_get_str, (void *)fmpz_add, (void *)fmpz_mul, (void *)fmpz_pow_ui, (void *)fmpz_cmp, (void *)fmpz_abs, (void *)fmpz_fac_ui,
-        (void *)fmpz_set_str, (void *)fmpz_sizeinbase, (void *)fmpz_is_zero, (void *)fmpz_is_one, (void *)fmpz_sgn, (void *)fmpz_neg, (void *)fmpz_factor_init, (void *)fmpz_factor_clear, (void *)fmpz_factor
+        (void *)fmpz_set_str, (void *)fmpz_sizeinbase, (void *)fmpz_is_zero, (void *)fmpz_is_one, (void *)fmpz_sgn, (void *)fmpz_neg, (void *)fmpz_factor_init, (void *)fmpz_factor_clear, (void *)fmpz_factor, (void *)fmpz_euler_phi
     };
     
     // This check prevents the compiler from optimizing away the `refs` array.
