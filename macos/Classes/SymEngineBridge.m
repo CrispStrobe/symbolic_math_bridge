@@ -59,6 +59,7 @@ extern char* flutter_symengine_e_with_precision(int decimal_digits);
 extern char* flutter_symengine_euler_gamma_with_precision(int decimal_digits);
 extern char* flutter_symengine_sqrt2_with_precision(int decimal_digits);
 extern char* flutter_symengine_evalf_with_precision(const char* expression, int decimal_digits);
+extern char* flutter_symengine_cevalf_with_precision(const char* expression, int decimal_digits);
 extern char* flutter_symengine_besselj(int order, const char* x_str);
 extern char* flutter_symengine_bessely(int order, const char* x_str);
 // Number-theory primitives (round 89)
@@ -207,6 +208,7 @@ extern void fmpz_euler_phi(void* res, const void* n); // round 4: totient
         flutter_symengine_euler_gamma_with_precision,
         flutter_symengine_sqrt2_with_precision,
         flutter_symengine_evalf_with_precision,
+        flutter_symengine_cevalf_with_precision,
         flutter_symengine_besselj,
         flutter_symengine_bessely,
         flutter_symengine_isprime,
