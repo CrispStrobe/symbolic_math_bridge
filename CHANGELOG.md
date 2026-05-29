@@ -1,3 +1,22 @@
+## 1.2.1 (2026-05-29)
+
+Windows runtime loader fix. In a consumer build the SymEngine wrapper
+symbols live in the bundled `libsymbolic_math_bridge.dll`, while the
+side-by-side `symbolic_math_bridge_plugin.dll` is only the thin
+Flutter registrar (no `flutter_symengine_*` exports in
+consumer-prebuilt mode). The Dart loader was opening the registrar
+DLL, so on a real Windows desktop every FFI lookup would fail with
+"requires native library".
+
+* `_openNativeLibrary()` now tries `libsymbolic_math_bridge.dll` first
+  (the consumer layout) and falls back to
+  `symbolic_math_bridge_plugin.dll` (the CI full-from-source layout).
+  Strictly non-regressive — the old name is still attempted.
+
+Reasoned-correct from the Windows `GetProcAddress` single-module
+resolution semantics + the consumer CMake's symbol split; still wants
+a real-hardware runtime confirmation (no Windows host available here).
+
 ## 1.2.0 (2026-05-29)
 
 Linux x86_64 support (P11 R130). The last tier-1 platform — the
