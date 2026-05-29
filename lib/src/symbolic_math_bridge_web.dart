@@ -52,6 +52,9 @@ class SymbolicMathBridge {
     throw SymbolicMathNotAvailableException('SymEngine (web build)');
   }
 
+  /// Native `integrate` availability probe — always false on web.
+  bool get hasIntegrate => false;
+
   bool isValidExpression(String expression) => _unavailable('isValidExpression');
 
   String evaluate(String expression) => _unavailable('evaluate');
