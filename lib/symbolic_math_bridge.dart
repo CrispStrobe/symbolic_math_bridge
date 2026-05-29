@@ -301,6 +301,8 @@ class SymbolicMathBridge {
 
   // Generic arbitrary-precision numeric evaluation of any expression.
   _EvalfPrecisionDart? _evalfWithPrecision;
+  // Complex (MPC) arbitrary-precision evaluation.
+  _EvalfPrecisionDart? _cevalfWithPrecision;
 
   // Bessel J/Y (integer order, real arg) via MPFR.
   _BesselDart? _besselj;
@@ -579,6 +581,14 @@ class SymbolicMathBridge {
         );
       } catch (_) {
         _evalfWithPrecision = null;
+      }
+      try {
+        _cevalfWithPrecision =
+            _dylib.lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
+          'flutter_symengine_cevalf_with_precision',
+        );
+      } catch (_) {
+        _cevalfWithPrecision = null;
       }
       try {
         _besselj = _dylib.lookupFunction<_BesselC, _BesselDart>(
@@ -1235,6 +1245,47 @@ class SymbolicMathBridge {
         final result = resultC.toDartString();
         if (result.startsWith('Error in ')) {
           throw SymbolicMathException('evalf_with_precision', result);
+        }
+        return result;
+      } finally {
+        _freeString(resultC);
+      }
+    } finally {
+      malloc.free(exprC);
+    }
+  }
+
+  /// Complex arbitrary-precision evaluation: evalf [expression] to
+  /// [precision] decimal digits via the MPC path (basic_evalf real=0).
+  /// Returns SymEngine's "a + b*I" string. Backs `cevalf(expr, N)`.
+  String mpfrCevalf(String expression, int precision) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException('MPC cevalf');
+    }
+    final fn = _cevalfWithPrecision;
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+        'flutter_symengine_cevalf_with_precision (older bridge build — '
+        'rebuild from math-stack-ios-builder)',
+      );
+    }
+    if (precision < 1 || precision > 10000) {
+      throw SymbolicMathException(
+        'cevalf_with_precision',
+        'precision must be in 1..10000 (got $precision)',
+      );
+    }
+    final exprC = expression.toNativeUtf8();
+    try {
+      final resultC = fn(exprC, precision);
+      if (resultC == nullptr) {
+        throw SymbolicMathException(
+            'cevalf_with_precision', 'native returned null');
+      }
+      try {
+        final result = resultC.toDartString();
+        if (result.startsWith('Error in ')) {
+          throw SymbolicMathException('cevalf_with_precision', result);
         }
         return result;
       } finally {
