@@ -303,6 +303,14 @@ class SymbolicMathBridge {
   // Round 90: integer factorization via FLINT.
   _UnaryFuncDart? _factorint;
 
+  // Round 4 (precision arc): modular arithmetic + multiplicative
+  // number theory. modpow takes three string args (the _Substitute
+  // shape); modinv/jacobi two (_BinaryFunc); totient one (_UnaryFunc).
+  _SubstituteDart? _modpow;
+  _BinaryFuncDart? _modinv;
+  _UnaryFuncDart? _totient;
+  _BinaryFuncDart? _jacobi;
+
   // Matrix operations
   late final _MatrixNewDart _matrixNew;
   late final _MatrixFreeDart _matrixFree;
@@ -584,6 +592,34 @@ class SymbolicMathBridge {
         );
       } catch (_) {
         _factorint = null;
+      }
+      try {
+        _modpow = _dylib.lookupFunction<_SubstituteC, _SubstituteDart>(
+          'flutter_symengine_modpow',
+        );
+      } catch (_) {
+        _modpow = null;
+      }
+      try {
+        _modinv = _dylib.lookupFunction<_BinaryFuncC, _BinaryFuncDart>(
+          'flutter_symengine_modinv',
+        );
+      } catch (_) {
+        _modinv = null;
+      }
+      try {
+        _totient = _dylib.lookupFunction<_UnaryFuncC, _UnaryFuncDart>(
+          'flutter_symengine_totient',
+        );
+      } catch (_) {
+        _totient = null;
+      }
+      try {
+        _jacobi = _dylib.lookupFunction<_BinaryFuncC, _BinaryFuncDart>(
+          'flutter_symengine_jacobi',
+        );
+      } catch (_) {
+        _jacobi = null;
       }
 
       // Matrix operations
@@ -1232,4 +1268,103 @@ class SymbolicMathBridge {
   // into structured `(prime, exponent)` records.
   String ntheoryFactorint(String n) =>
       _callStringInOut(_factorint, 'factorint', n);
+
+  // Round 4 (precision arc): two-string-in / string-out helper, the
+  // binary sibling of [_callStringInOut].
+  String _callStringInOut2(
+    _BinaryFuncDart? fn,
+    String op,
+    String a,
+    String b,
+  ) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException(op);
+    }
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+        'flutter_symengine_$op (older bridge build — rebuild from '
+        'math-stack-ios-builder)',
+      );
+    }
+    final aC = a.toNativeUtf8();
+    final bC = b.toNativeUtf8();
+    try {
+      final resultC = fn(aC, bC);
+      if (resultC == nullptr) {
+        throw SymbolicMathException(op, 'native returned null');
+      }
+      try {
+        final result = resultC.toDartString();
+        if (result.startsWith('Error in ')) {
+          throw SymbolicMathException(op, result);
+        }
+        return result;
+      } finally {
+        _freeString(resultC);
+      }
+    } finally {
+      malloc.free(aC);
+      malloc.free(bC);
+    }
+  }
+
+  // Three-string-in / string-out helper (the _Substitute shape), used
+  // by modpow.
+  String _callStringInOut3(
+    _SubstituteDart? fn,
+    String op,
+    String a,
+    String b,
+    String c,
+  ) {
+    if (!_symEngineAvailable) {
+      throw SymbolicMathNotAvailableException(op);
+    }
+    if (fn == null) {
+      throw SymbolicMathNotAvailableException(
+        'flutter_symengine_$op (older bridge build — rebuild from '
+        'math-stack-ios-builder)',
+      );
+    }
+    final aC = a.toNativeUtf8();
+    final bC = b.toNativeUtf8();
+    final cC = c.toNativeUtf8();
+    try {
+      final resultC = fn(aC, bC, cC);
+      if (resultC == nullptr) {
+        throw SymbolicMathException(op, 'native returned null');
+      }
+      try {
+        final result = resultC.toDartString();
+        if (result.startsWith('Error in ')) {
+          throw SymbolicMathException(op, result);
+        }
+        return result;
+      } finally {
+        _freeString(resultC);
+      }
+    } finally {
+      malloc.free(aC);
+      malloc.free(bC);
+      malloc.free(cC);
+    }
+  }
+
+  // Round 4: a^e mod m (GMP mpz_powm; negative e handled when a is
+  // invertible mod m).
+  String ntheoryModpow(String a, String e, String m) =>
+      _callStringInOut3(_modpow, 'modpow', a, e, m);
+
+  // Round 4: modular inverse a^-1 mod m (errors when gcd(a, m) != 1).
+  String ntheoryModinv(String a, String m) =>
+      _callStringInOut2(_modinv, 'modinv', a, m);
+
+  // Round 4: Euler's totient phi(n) via FLINT fmpz_euler_phi.
+  String ntheoryTotient(String n) =>
+      _callStringInOut(_totient, 'totient', n);
+
+  // Round 4: Jacobi symbol (a/n) as the string "-1" / "0" / "1"
+  // (n odd and positive).
+  String ntheoryJacobi(String a, String n) =>
+      _callStringInOut2(_jacobi, 'jacobi', a, n);
 }
