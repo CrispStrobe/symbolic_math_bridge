@@ -547,18 +547,18 @@ class SymbolicMathBridge {
         _sqrt2WithPrecision = null;
       }
       try {
-        _evalfWithPrecision =
-            _dylib.lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
-          'flutter_symengine_evalf_with_precision',
-        );
+        _evalfWithPrecision = _dylib
+            .lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
+              'flutter_symengine_evalf_with_precision',
+            );
       } catch (_) {
         _evalfWithPrecision = null;
       }
       try {
-        _cevalfWithPrecision =
-            _dylib.lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
-          'flutter_symengine_cevalf_with_precision',
-        );
+        _cevalfWithPrecision = _dylib
+            .lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
+              'flutter_symengine_cevalf_with_precision',
+            );
       } catch (_) {
         _cevalfWithPrecision = null;
       }
@@ -1211,7 +1211,9 @@ class SymbolicMathBridge {
       final resultC = fn(exprC, precision);
       if (resultC == nullptr) {
         throw SymbolicMathException(
-            'evalf_with_precision', 'native returned null');
+          'evalf_with_precision',
+          'native returned null',
+        );
       }
       try {
         final result = resultC.toDartString();
@@ -1252,7 +1254,9 @@ class SymbolicMathBridge {
       final resultC = fn(exprC, precision);
       if (resultC == nullptr) {
         throw SymbolicMathException(
-            'cevalf_with_precision', 'native returned null');
+          'cevalf_with_precision',
+          'native returned null',
+        );
       }
       try {
         final result = resultC.toDartString();
@@ -1270,10 +1274,12 @@ class SymbolicMathBridge {
 
   /// Bessel function of the first kind J_order(x), integer [order], real
   /// [x], via MPFR's mpfr_jn. Returns a ~15-digit numeric string.
-  String mpfrBesselJ(int order, String x) => _bessel(_besselj, 'besselj', order, x);
+  String mpfrBesselJ(int order, String x) =>
+      _bessel(_besselj, 'besselj', order, x);
 
   /// Bessel function of the second kind Y_order(x), via mpfr_yn.
-  String mpfrBesselY(int order, String x) => _bessel(_bessely, 'bessely', order, x);
+  String mpfrBesselY(int order, String x) =>
+      _bessel(_bessely, 'bessely', order, x);
 
   String _bessel(_BesselDart? fn, String op, int order, String x) {
     if (!_symEngineAvailable) {
@@ -1406,12 +1412,7 @@ class SymbolicMathBridge {
 
   // Round 4 (precision arc): two-string-in / string-out helper, the
   // binary sibling of [_callStringInOut].
-  String _callStringInOut2(
-    _BinaryFuncDart? fn,
-    String op,
-    String a,
-    String b,
-  ) {
+  String _callStringInOut2(_BinaryFuncDart? fn, String op, String a, String b) {
     if (!_symEngineAvailable) {
       throw SymbolicMathNotAvailableException(op);
     }
@@ -1495,8 +1496,7 @@ class SymbolicMathBridge {
       _callStringInOut2(_modinv, 'modinv', a, m);
 
   // Round 4: Euler's totient phi(n) via FLINT fmpz_euler_phi.
-  String ntheoryTotient(String n) =>
-      _callStringInOut(_totient, 'totient', n);
+  String ntheoryTotient(String n) => _callStringInOut(_totient, 'totient', n);
 
   // Round 4: Jacobi symbol (a/n) as the string "-1" / "0" / "1"
   // (n odd and positive).
