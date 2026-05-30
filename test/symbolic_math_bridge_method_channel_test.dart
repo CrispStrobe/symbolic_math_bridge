@@ -5,11 +5,12 @@ import 'package:symbolic_math_bridge/symbolic_math_bridge_method_channel.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  MethodChannelSymbolicMathBridge platform = MethodChannelSymbolicMathBridge();
-  const MethodChannel channel = MethodChannel('symbolic_math_bridge');
+  final platform = MethodChannelSymbolicMathBridge();
+  const channel = MethodChannel('symbolic_math_bridge');
 
   setUp(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
       channel,
       (MethodCall methodCall) async {
         return '42';
@@ -18,10 +19,11 @@ void main() {
   });
 
   tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
   });
 
-  test('getPlatformVersion', () async {
+  test('getPlatformVersion returns mocked value', () async {
     expect(await platform.getPlatformVersion(), '42');
   });
 }
