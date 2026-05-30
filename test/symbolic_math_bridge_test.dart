@@ -18,7 +18,7 @@ void main() {
   });
 
   test('SymbolicMathException stores operation and message', () {
-    const e = SymbolicMathException('evaluate', 'parse error');
+    final e = SymbolicMathException('evaluate', 'parse error');
     expect(e.operation, 'evaluate');
     expect(e.message, 'parse error');
     expect(e.toString(), contains('evaluate'));
@@ -26,18 +26,20 @@ void main() {
   });
 
   test('SymbolicMathParseException is a SymbolicMathException', () {
-    const e = SymbolicMathParseException('evaluate', 'bad input');
+    final e = SymbolicMathParseException('evaluate', 'bad input');
     expect(e, isA<SymbolicMathException>());
     expect(e.operation, 'evaluate');
   });
 
   test('SymbolicMathMemoryException is a SymbolicMathException', () {
-    const e = SymbolicMathMemoryException('matrix', 'out of memory');
+    final e = SymbolicMathMemoryException('matrix');
     expect(e, isA<SymbolicMathException>());
+    expect(e.message, contains('Memory'));
   });
 
   test('SymbolicMathNotAvailableException is a SymbolicMathException', () {
-    const e = SymbolicMathNotAvailableException('evaluate', 'not available');
+    final e = SymbolicMathNotAvailableException('symengine');
     expect(e, isA<SymbolicMathException>());
+    expect(e.message, contains('not available'));
   });
 }
