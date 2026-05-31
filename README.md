@@ -6,22 +6,26 @@
 
 A comprehensive Flutter plugin providing unified `dart:ffi` access to a powerful mathematical computing stack. This plugin integrates **GMP, MPFR, MPC, FLINT, and SymEngine** libraries, offering both high-level symbolic computation and direct, low-level access to each library's core functions.
 
-> **Platform status (v1.1.0):** full SymEngine on **iOS, macOS,
-> Android (arm64-v8a), Windows (x86_64)**. CI workflows produce the
-> native artifacts:
+> **Platform status (v1.3.0):** full SymEngine on **iOS, macOS,
+> Android (arm64-v8a), Windows (x86_64), Linux (x86_64), Web (WASM)**.
 >
 > | Platform | Artifact | Built by |
 > |---|---|---|
 > | iOS, macOS | `.xcframework` bundles under `ios/` | `math-stack-ios-builder` (separate repo) |
 > | Android arm64-v8a | `android/src/main/jniLibs/arm64-v8a/libsymbolic_math_bridge.so` | `.github/workflows/build-android.yml` (vcpkg + NDK cross-compile) |
-> | Windows x86_64 | `windows/Libraries/symbolic_math_bridge_plugin.dll` | `.github/workflows/build-windows.yml` (MSYS2/MinGW64 + source-built SymEngine) |
+> | Windows x86_64 | `windows/Libraries/libsymbolic_math_bridge.dll` | `.github/workflows/build-windows.yml` (MSYS2/MinGW64 + source-built SymEngine) |
+> | Linux x86_64 | `linux/Libraries/libsymbolic_math_bridge.so` | `.github/workflows/build-linux.yml` (vcpkg x64-linux static) |
+> | **Web (WASM)** | `symengine.js` + `symengine.wasm` (1.1 MB) | `math-stack-ios-builder` Emscripten build (`INTEGER_CLASS=boostmp`) |
 >
-> See [`ANDROID_STATUS.md`](ANDROID_STATUS.md) +
-> [`WINDOWS_STATUS.md`](WINDOWS_STATUS.md) for the per-platform
-> iteration logs. Linux is not yet built (tracked as PLAN P11 R130 in
-> the CrispCalc host repo). Android `x86_64` (emulator) and
-> `armeabi-v7a` (32-bit phones) ABIs deferred — extend the workflow
-> matrix when needed.
+> The web build provides full CAS (evaluate, expand, differentiate,
+> solve, substitute, trig/hyp/exp/log, gcd/lcm/factorial/fibonacci,
+> matrices). Functions requiring GMP/MPFR/FLINT (isprime, factorint,
+> Bessel, arbitrary-precision evalf, modular arithmetic) return clean
+> error strings.
+>
+> See [`ANDROID_STATUS.md`](ANDROID_STATUS.md),
+> [`WINDOWS_STATUS.md`](WINDOWS_STATUS.md), and
+> [`LINUX_STATUS.md`](LINUX_STATUS.md) for per-platform iteration logs.
 
 ## Features
 
@@ -241,8 +245,10 @@ After a successful build, the script will automatically verify the integrity of 
 
 - ✅ **iOS**: 13.0+ (arm64 device, arm64/x86_64 simulator)
 - ✅ **macOS**: 10.15+ (arm64/x86_64 universal)
-- ❌ **Android**: Not yet implemented
-- ❌ **Web**: Cannot support native C libraries
+- ✅ **Android**: arm64-v8a (v1.1.0)
+- ✅ **Windows**: x86_64 (v1.1.0)
+- ✅ **Linux**: x86_64, GLIBC 2.35+ (v1.2.0)
+- ✅ **Web**: WASM via Emscripten (v1.3.0) — full CAS core, no MPFR/FLINT
 
 ## Performance Characteristics
 

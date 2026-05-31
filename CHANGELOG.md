@@ -1,3 +1,42 @@
+## 1.3.0 (2026-05-31)
+
+Web support via SymEngine WASM. The bridge now provides real CAS
+operations in the browser — the throw-only web stub has been replaced
+with a `dart:js_interop` implementation that calls into SymEngine
+compiled to WebAssembly.
+
+* **`symbolic_math_bridge_web.dart` rewritten** from a throw-only stub
+  to a full WASM bridge. Uses Emscripten's `ccall` via `dart:js_interop`
+  to invoke all 55 `flutter_symengine_*` C functions in the WASM module.
+* **Two-phase loading**: constructor throws until the WASM module has
+  loaded (preserving the existing consumer pattern), then all CAS calls
+  route through WASM. `SymbolicMathBridge.tryLoadWasm()` lets consumers
+  check/trigger readiness. `NumericFallbackEvaluator` remains the
+  synchronous pre-load path — no behavior change before WASM is ready.
+* **Full CAS core on web**: evaluate, expand, differentiate, solve,
+  substitute, 17 unary math functions (sin/cos/tan/asin/acos/atan/
+  sinh/cosh/tanh/asinh/acosh/atanh/exp/log/sqrt/gamma/abs),
+  gcd/lcm/factorial/fibonacci, symbolic constants (pi/e/gamma), and
+  matrix operations (create/set/get/det/inv/add/mul).
+* **Clean degradation for GMP/MPFR/FLINT features**: isprime,
+  nextprime, prevprime, factorint, modpow, modinv, totient, jacobi,
+  Bessel J/Y, arbitrary-precision evalf/cevalf, and precision constants
+  all call into WASM stubs that return `"Error in <op>: not available
+  in web build (requires GMP/MPFR/FLINT)"` — consumers see the same
+  `SymbolicMathException` they already handle.
+* **Matrix ops via opaque pointers**: WASM pointers are `i32` indices
+  passed as `'number'` type through `ccall`. The Dart `SymEngineMatrix`
+  class holds the int handle and passes it back on each matrix call.
+
+### WASM module (built in math-stack-ios-builder)
+
+* SymEngine 0.11.2 + Boost.Multiprecision 1.87 (header-only).
+* `INTEGER_CLASS=boostmp` — no GMP/MPFR/FLINT native deps.
+* Emscripten 5.0.7, `-O2`, `MODULARIZE=1`.
+* Output: `symengine.js` (24 KB glue) + `symengine.wasm` (1.1 MB).
+* Ships in `CrispCalc/web/`; loaded via `<script>` before Flutter
+  bootstrap.
+
 ## 1.2.1 (2026-05-29)
 
 Windows runtime loader fix. In a consumer build the SymEngine wrapper
