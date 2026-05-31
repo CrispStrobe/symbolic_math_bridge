@@ -17,8 +17,8 @@ import 'symbolic_math_exceptions.dart';
 // Core symbolic operations
 typedef _EvaluateC = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _SolveC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
-typedef _SubstituteC =
-    Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
+typedef _SubstituteC = Pointer<Utf8> Function(
+    Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
 typedef _FreeStringC = Void Function(Pointer<Utf8>);
 typedef _UnaryFuncC = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _BinaryFuncC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
@@ -32,10 +32,10 @@ typedef _BesselC = Pointer<Utf8> Function(Int32, Pointer<Utf8>);
 // Matrix operations
 typedef _MatrixNewC = Pointer<Void> Function(Int32, Int32);
 typedef _MatrixFreeC = Void Function(Pointer<Void>);
-typedef _MatrixSetElementC =
-    Int32 Function(Pointer<Void>, Int32, Int32, Pointer<Utf8>);
-typedef _MatrixGetElementC =
-    Pointer<Utf8> Function(Pointer<Void>, Int32, Int32);
+typedef _MatrixSetElementC = Int32 Function(
+    Pointer<Void>, Int32, Int32, Pointer<Utf8>);
+typedef _MatrixGetElementC = Pointer<Utf8> Function(
+    Pointer<Void>, Int32, Int32);
 typedef _MatrixToStringC = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpC = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpReturnsMatrixC = Pointer<Void> Function(Pointer<Void>);
@@ -47,8 +47,8 @@ typedef _MatrixBinaryOpC = Pointer<Void> Function(Pointer<Void>, Pointer<Void>);
 
 typedef _EvaluateDart = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _SolveDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
-typedef _SubstituteDart =
-    Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
+typedef _SubstituteDart = Pointer<Utf8> Function(
+    Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
 typedef _UnaryFuncDart = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _BinaryFuncDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
@@ -61,14 +61,14 @@ typedef _BesselDart = Pointer<Utf8> Function(int, Pointer<Utf8>);
 
 typedef _MatrixNewDart = Pointer<Void> Function(int, int);
 typedef _MatrixFreeDart = void Function(Pointer<Void>);
-typedef _MatrixSetElementDart =
-    int Function(Pointer<Void>, int, int, Pointer<Utf8>);
+typedef _MatrixSetElementDart = int Function(
+    Pointer<Void>, int, int, Pointer<Utf8>);
 typedef _MatrixGetElementDart = Pointer<Utf8> Function(Pointer<Void>, int, int);
 typedef _MatrixToStringDart = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpDart = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpReturnsMatrixDart = Pointer<Void> Function(Pointer<Void>);
-typedef _MatrixBinaryOpDart =
-    Pointer<Void> Function(Pointer<Void>, Pointer<Void>);
+typedef _MatrixBinaryOpDart = Pointer<Void> Function(
+    Pointer<Void>, Pointer<Void>);
 
 // ============================================================================
 // MATRIX FINALIZER
@@ -531,18 +531,18 @@ class SymbolicMathBridge {
         _eWithPrecision = null;
       }
       try {
-        _eulerGammaWithPrecision = _dylib
-            .lookupFunction<_FactorialC, _FactorialDart>(
-              'flutter_symengine_euler_gamma_with_precision',
-            );
+        _eulerGammaWithPrecision =
+            _dylib.lookupFunction<_FactorialC, _FactorialDart>(
+          'flutter_symengine_euler_gamma_with_precision',
+        );
       } catch (_) {
         _eulerGammaWithPrecision = null;
       }
       try {
-        _sqrt2WithPrecision = _dylib
-            .lookupFunction<_FactorialC, _FactorialDart>(
-              'flutter_symengine_sqrt2_with_precision',
-            );
+        _sqrt2WithPrecision =
+            _dylib.lookupFunction<_FactorialC, _FactorialDart>(
+          'flutter_symengine_sqrt2_with_precision',
+        );
       } catch (_) {
         _sqrt2WithPrecision = null;
       }
@@ -644,26 +644,23 @@ class SymbolicMathBridge {
       _matrixFree = _dylib.lookupFunction<_MatrixFreeC, _MatrixFreeDart>(
         'flutter_symengine_matrix_free',
       );
-      _matrixSetElement = _dylib
-          .lookupFunction<_MatrixSetElementC, _MatrixSetElementDart>(
-            'flutter_symengine_matrix_set_element',
-          );
-      _matrixGetElement = _dylib
-          .lookupFunction<_MatrixGetElementC, _MatrixGetElementDart>(
-            'flutter_symengine_matrix_get_element',
-          );
-      _matrixToString = _dylib
-          .lookupFunction<_MatrixToStringC, _MatrixToStringDart>(
-            'flutter_symengine_matrix_to_string',
-          );
+      _matrixSetElement =
+          _dylib.lookupFunction<_MatrixSetElementC, _MatrixSetElementDart>(
+        'flutter_symengine_matrix_set_element',
+      );
+      _matrixGetElement =
+          _dylib.lookupFunction<_MatrixGetElementC, _MatrixGetElementDart>(
+        'flutter_symengine_matrix_get_element',
+      );
+      _matrixToString =
+          _dylib.lookupFunction<_MatrixToStringC, _MatrixToStringDart>(
+        'flutter_symengine_matrix_to_string',
+      );
       _matrixDet = _dylib.lookupFunction<_MatrixUnaryOpC, _MatrixUnaryOpDart>(
         'flutter_symengine_matrix_det',
       );
-      _matrixInv = _dylib
-          .lookupFunction<
-            _MatrixUnaryOpReturnsMatrixC,
-            _MatrixUnaryOpReturnsMatrixDart
-          >('flutter_symengine_matrix_inv');
+      _matrixInv = _dylib.lookupFunction<_MatrixUnaryOpReturnsMatrixC,
+          _MatrixUnaryOpReturnsMatrixDart>('flutter_symengine_matrix_inv');
       _matrixAdd = _dylib.lookupFunction<_MatrixBinaryOpC, _MatrixBinaryOpDart>(
         'flutter_symengine_matrix_add',
       );
@@ -1211,7 +1208,9 @@ class SymbolicMathBridge {
       final resultC = fn(exprC, precision);
       if (resultC == nullptr) {
         throw SymbolicMathException(
-            'evalf_with_precision', 'native returned null');
+          'evalf_with_precision',
+          'native returned null',
+        );
       }
       try {
         final result = resultC.toDartString();
@@ -1252,7 +1251,9 @@ class SymbolicMathBridge {
       final resultC = fn(exprC, precision);
       if (resultC == nullptr) {
         throw SymbolicMathException(
-            'cevalf_with_precision', 'native returned null');
+          'cevalf_with_precision',
+          'native returned null',
+        );
       }
       try {
         final result = resultC.toDartString();
@@ -1270,10 +1271,12 @@ class SymbolicMathBridge {
 
   /// Bessel function of the first kind J_order(x), integer [order], real
   /// [x], via MPFR's mpfr_jn. Returns a ~15-digit numeric string.
-  String mpfrBesselJ(int order, String x) => _bessel(_besselj, 'besselj', order, x);
+  String mpfrBesselJ(int order, String x) =>
+      _bessel(_besselj, 'besselj', order, x);
 
   /// Bessel function of the second kind Y_order(x), via mpfr_yn.
-  String mpfrBesselY(int order, String x) => _bessel(_bessely, 'bessely', order, x);
+  String mpfrBesselY(int order, String x) =>
+      _bessel(_bessely, 'bessely', order, x);
 
   String _bessel(_BesselDart? fn, String op, int order, String x) {
     if (!_symEngineAvailable) {
@@ -1406,12 +1409,7 @@ class SymbolicMathBridge {
 
   // Round 4 (precision arc): two-string-in / string-out helper, the
   // binary sibling of [_callStringInOut].
-  String _callStringInOut2(
-    _BinaryFuncDart? fn,
-    String op,
-    String a,
-    String b,
-  ) {
+  String _callStringInOut2(_BinaryFuncDart? fn, String op, String a, String b) {
     if (!_symEngineAvailable) {
       throw SymbolicMathNotAvailableException(op);
     }
@@ -1495,8 +1493,7 @@ class SymbolicMathBridge {
       _callStringInOut2(_modinv, 'modinv', a, m);
 
   // Round 4: Euler's totient phi(n) via FLINT fmpz_euler_phi.
-  String ntheoryTotient(String n) =>
-      _callStringInOut(_totient, 'totient', n);
+  String ntheoryTotient(String n) => _callStringInOut(_totient, 'totient', n);
 
   // Round 4: Jacobi symbol (a/n) as the string "-1" / "0" / "1"
   // (n odd and positive).

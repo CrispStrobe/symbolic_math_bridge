@@ -81,7 +81,7 @@ jobs:
           if [ -d "$NDK_BASE/${ANDROID_NDK_VERSION}" ]; then
             NDK="$NDK_BASE/${ANDROID_NDK_VERSION}"
           else
-            NDK="$(ls -d $NDK_BASE/* 2>/dev/null | sort -V | tail -n 1)"
+            NDK="$(find "$NDK_BASE" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -n 1)"
           fi
           if [ ! -d "$NDK" ]; then
             echo "::error::No Android NDK found under $NDK_BASE"

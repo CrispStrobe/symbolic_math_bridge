@@ -47,8 +47,10 @@ ABIS="${ABIS:-arm64-v8a x86_64}"
 BUILDER_DIR="${BUILDER_DIR:-../math-stack-android-builder}"
 API_LEVEL="${API_LEVEL:-21}"
 
-readonly SCRIPTDIR="$(cd "$(dirname "$0")" && pwd)"
-readonly PLUGIN_ROOT="$(cd "$SCRIPTDIR/.." && pwd)"
+SCRIPTDIR="$(cd "$(dirname "$0")" && pwd)"
+readonly SCRIPTDIR
+PLUGIN_ROOT="$(cd "$SCRIPTDIR/.." && pwd)"
+readonly PLUGIN_ROOT
 readonly JNI_DIR="$PLUGIN_ROOT/android/src/main/jniLibs"
 
 log() { printf "[ANDROID-BUILD] %s\n" "$1"; }

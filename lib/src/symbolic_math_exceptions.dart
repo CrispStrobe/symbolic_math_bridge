@@ -29,10 +29,10 @@ class SymbolicMathParseException extends SymbolicMathException {
 
 class SymbolicMathMemoryException extends SymbolicMathException {
   SymbolicMathMemoryException(String operation, [String? library])
-    : super(operation, 'Memory allocation failed', library);
+      : super(operation, 'Memory allocation failed', library);
 }
 
 class SymbolicMathNotAvailableException extends SymbolicMathException {
   SymbolicMathNotAvailableException(String library)
-    : super('initialize', 'Library not available: $library', library);
+      : super('initialize', 'Library not available: $library', library);
 }

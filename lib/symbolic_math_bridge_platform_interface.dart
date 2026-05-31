@@ -8,7 +8,8 @@ abstract class SymbolicMathBridgePlatform extends PlatformInterface {
 
   static final Object _token = Object();
 
-  static SymbolicMathBridgePlatform _instance = MethodChannelSymbolicMathBridge();
+  static SymbolicMathBridgePlatform _instance =
+      MethodChannelSymbolicMathBridge();
 
   /// The default instance of [SymbolicMathBridgePlatform] to use.
   ///
