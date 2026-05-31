@@ -115,8 +115,7 @@ String _ccallStrInt(JSObject m, String fn, String a, int b) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-Never _unavailable(String op) =>
-    throw SymbolicMathNotAvailableException(
+Never _unavailable(String op) => throw SymbolicMathNotAvailableException(
       'SymEngine WASM not loaded: $op',
     );
 
@@ -378,9 +377,23 @@ class SymbolicMathBridge {
   // ---------- Mathematical functions ----------
 
   static const _unaryFuncNames = [
-    'abs', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
-    'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
-    'exp', 'log', 'sqrt', 'gamma',
+    'abs',
+    'sin',
+    'cos',
+    'tan',
+    'asin',
+    'acos',
+    'atan',
+    'sinh',
+    'cosh',
+    'tanh',
+    'asinh',
+    'acosh',
+    'atanh',
+    'exp',
+    'log',
+    'sqrt',
+    'gamma',
   ];
 
   String callUnary(String funcName, String expression) {
@@ -396,11 +409,9 @@ class SymbolicMathBridge {
 
   // ---------- Number theory ----------
 
-  String gcd(String a, String b) =>
-      _call2('flutter_symengine_gcd', a, b);
+  String gcd(String a, String b) => _call2('flutter_symengine_gcd', a, b);
 
-  String lcm(String a, String b) =>
-      _call2('flutter_symengine_lcm', a, b);
+  String lcm(String a, String b) => _call2('flutter_symengine_lcm', a, b);
 
   String factorial(int n) {
     final r = _ccallInt(_module, 'flutter_symengine_factorial', n);
@@ -462,8 +473,7 @@ class SymbolicMathBridge {
   String getVersion() => _ccall0(_module, 'flutter_symengine_version');
   String testBasicOperations() =>
       _ccall0(_module, 'flutter_symengine_test_basic_operations');
-  String testSymbolic() =>
-      _ccall0(_module, 'flutter_symengine_test_symbolic');
+  String testSymbolic() => _ccall0(_module, 'flutter_symengine_test_symbolic');
   String getPreferredWrapperType() => 'SymEngine WASM (boostmp)';
 
   List<String> getAvailableUnaryFunctions() => List.of(_unaryFuncNames);
@@ -483,13 +493,15 @@ class SymbolicMathBridge {
       );
 
   String mpfrHighPrecisionPi(int precision) {
-    final r = _ccallInt(_module, 'flutter_symengine_pi_with_precision', precision);
+    final r =
+        _ccallInt(_module, 'flutter_symengine_pi_with_precision', precision);
     _checkError(r, 'pi_with_precision');
     return r;
   }
 
   String mpfrHighPrecisionE(int precision) {
-    final r = _ccallInt(_module, 'flutter_symengine_e_with_precision', precision);
+    final r =
+        _ccallInt(_module, 'flutter_symengine_e_with_precision', precision);
     _checkError(r, 'e_with_precision');
     return r;
   }
@@ -565,14 +577,11 @@ class SymbolicMathBridge {
     return r == 'true';
   }
 
-  String ntheoryNextprime(String n) =>
-      _call1('flutter_symengine_nextprime', n);
+  String ntheoryNextprime(String n) => _call1('flutter_symengine_nextprime', n);
 
-  String ntheoryPrevprime(String n) =>
-      _call1('flutter_symengine_prevprime', n);
+  String ntheoryPrevprime(String n) => _call1('flutter_symengine_prevprime', n);
 
-  String ntheoryFactorint(String n) =>
-      _call1('flutter_symengine_factorint', n);
+  String ntheoryFactorint(String n) => _call1('flutter_symengine_factorint', n);
 
   String ntheoryModpow(String a, String e, String m) =>
       _call3('flutter_symengine_modpow', a, e, m);
@@ -580,8 +589,7 @@ class SymbolicMathBridge {
   String ntheoryModinv(String a, String m) =>
       _call2('flutter_symengine_modinv', a, m);
 
-  String ntheoryTotient(String n) =>
-      _call1('flutter_symengine_totient', n);
+  String ntheoryTotient(String n) => _call1('flutter_symengine_totient', n);
 
   String ntheoryJacobi(String a, String n) =>
       _call2('flutter_symengine_jacobi', a, n);
