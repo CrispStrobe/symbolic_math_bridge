@@ -69,11 +69,7 @@ external JSNumber _jsCcallNumSetElem(
 );
 
 @JS('_symCcallStrGetElem')
-external JSString _jsCcallStrGetElem(
-  JSNumber ptr,
-  JSNumber row,
-  JSNumber col,
-);
+external JSString _jsCcallStrGetElem(JSNumber ptr, JSNumber row, JSNumber col);
 
 @JS('_symCcallStrFromPtr')
 external JSString _jsCcallStrFromPtr(JSString fn, JSNumber ptr);
@@ -96,7 +92,8 @@ bool _helpersInjected = false;
 
 void _injectHelpers() {
   if (_helpersInjected) return;
-  _jsEval('''
+  _jsEval(
+    '''
     window._symCcall0 = function(fn) {
       return symEngineInstance.ccall(fn, 'string', [], []);
     };
@@ -144,7 +141,8 @@ void _injectHelpers() {
       return symEngineInstance.ccall(fn, 'number', ['number','number'], [a, b]);
     };
   '''
-      .toJS);
+        .toJS,
+  );
   _helpersInjected = true;
 }
 
@@ -219,10 +217,7 @@ class SymEngineMatrix {
 
   void dispose() {
     if (!_disposed) {
-      _jsCcallVoidNum(
-        'flutter_symengine_matrix_free'.toJS,
-        _ptr.toJS,
-      );
+      _jsCcallVoidNum('flutter_symengine_matrix_free'.toJS, _ptr.toJS);
       _disposed = true;
     }
   }
@@ -379,6 +374,25 @@ class SymbolicMathBridge {
   String integrate(String expression, String symbol) =>
       _call2('flutter_symengine_integrate', expression, symbol);
 
+  // series/linsolve are not exported by the current WASM binary
+  // (wasm_exports.json predates the C2 arc). Gated off until the web
+  // build is regenerated with the new entry points.
+  bool get hasSeries => false;
+  bool get hasLinsolve => false;
+
+  String series(
+    String expression,
+    String symbol, {
+    String point = '0',
+    int order = 6,
+  }) {
+    throw SymbolicMathNotAvailableException('SymEngine series (web build)');
+  }
+
+  String linsolve(List<String> equations, List<String> symbols) {
+    throw SymbolicMathNotAvailableException('SymEngine linsolve (web build)');
+  }
+
   String substitute(String expression, String symbol, String value) =>
       _call3('flutter_symengine_substitute', expression, symbol, value);
 
@@ -501,10 +515,16 @@ class SymbolicMathBridge {
       _callInt('flutter_symengine_sqrt2_with_precision', precision);
 
   String mpfrEvalf(String expression, int precision) => _callStrInt(
-      'flutter_symengine_evalf_with_precision', expression, precision);
+    'flutter_symengine_evalf_with_precision',
+    expression,
+    precision,
+  );
 
   String mpfrCevalf(String expression, int precision) => _callStrInt(
-      'flutter_symengine_cevalf_with_precision', expression, precision);
+    'flutter_symengine_cevalf_with_precision',
+    expression,
+    precision,
+  );
 
   String mpfrBesselJ(int order, String x) =>
       _callIntStr('flutter_symengine_besselj', order, x);
