@@ -17,8 +17,8 @@ import 'symbolic_math_exceptions.dart';
 // Core symbolic operations
 typedef _EvaluateC = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _SolveC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
-typedef _SubstituteC = Pointer<Utf8> Function(
-    Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
+typedef _SubstituteC =
+    Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
 typedef _FreeStringC = Void Function(Pointer<Utf8>);
 typedef _UnaryFuncC = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _BinaryFuncC = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
@@ -27,15 +27,17 @@ typedef _GetVersionC = Pointer<Utf8> Function();
 typedef _FactorialC = Pointer<Utf8> Function(Int32);
 typedef _FibonacciC = Pointer<Utf8> Function(Int32);
 typedef _EvalfPrecisionC = Pointer<Utf8> Function(Pointer<Utf8>, Int32);
+typedef _SeriesC =
+    Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Int32);
 typedef _BesselC = Pointer<Utf8> Function(Int32, Pointer<Utf8>);
 
 // Matrix operations
 typedef _MatrixNewC = Pointer<Void> Function(Int32, Int32);
 typedef _MatrixFreeC = Void Function(Pointer<Void>);
-typedef _MatrixSetElementC = Int32 Function(
-    Pointer<Void>, Int32, Int32, Pointer<Utf8>);
-typedef _MatrixGetElementC = Pointer<Utf8> Function(
-    Pointer<Void>, Int32, Int32);
+typedef _MatrixSetElementC =
+    Int32 Function(Pointer<Void>, Int32, Int32, Pointer<Utf8>);
+typedef _MatrixGetElementC =
+    Pointer<Utf8> Function(Pointer<Void>, Int32, Int32);
 typedef _MatrixToStringC = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpC = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpReturnsMatrixC = Pointer<Void> Function(Pointer<Void>);
@@ -47,10 +49,12 @@ typedef _MatrixBinaryOpC = Pointer<Void> Function(Pointer<Void>, Pointer<Void>);
 
 typedef _EvaluateDart = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _SolveDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
-typedef _SubstituteDart = Pointer<Utf8> Function(
-    Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
+typedef _SubstituteDart =
+    Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
 typedef _UnaryFuncDart = Pointer<Utf8> Function(Pointer<Utf8>);
+typedef _SeriesDart =
+    Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, int);
 typedef _BinaryFuncDart = Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>);
 typedef _GetConstantDart = Pointer<Utf8> Function();
 typedef _GetVersionDart = Pointer<Utf8> Function();
@@ -61,14 +65,14 @@ typedef _BesselDart = Pointer<Utf8> Function(int, Pointer<Utf8>);
 
 typedef _MatrixNewDart = Pointer<Void> Function(int, int);
 typedef _MatrixFreeDart = void Function(Pointer<Void>);
-typedef _MatrixSetElementDart = int Function(
-    Pointer<Void>, int, int, Pointer<Utf8>);
+typedef _MatrixSetElementDart =
+    int Function(Pointer<Void>, int, int, Pointer<Utf8>);
 typedef _MatrixGetElementDart = Pointer<Utf8> Function(Pointer<Void>, int, int);
 typedef _MatrixToStringDart = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpDart = Pointer<Utf8> Function(Pointer<Void>);
 typedef _MatrixUnaryOpReturnsMatrixDart = Pointer<Void> Function(Pointer<Void>);
-typedef _MatrixBinaryOpDart = Pointer<Void> Function(
-    Pointer<Void>, Pointer<Void>);
+typedef _MatrixBinaryOpDart =
+    Pointer<Void> Function(Pointer<Void>, Pointer<Void>);
 
 // ============================================================================
 // MATRIX FINALIZER
@@ -242,6 +246,8 @@ class SymbolicMathBridge {
   late final _UnaryFuncDart _factor;
   late final _SolveDart _differentiate;
   late final _SolveDart? _integrate;
+  late final _SeriesDart? _series;
+  late final _SolveDart? _linsolve;
   late final _SubstituteDart _substitute;
   late final _FreeStringDart _freeString;
   late final _GetVersionDart _version;
@@ -411,6 +417,23 @@ class SymbolicMathBridge {
       } catch (_) {
         _integrate = null;
       }
+      // series/linsolve exist only in wrapper builds >= the C2 arc
+      // (SymEngine C++ series()/linsolve() via flutter_symengine_cas.cpp);
+      // older libs simply lack the symbols.
+      try {
+        _series = _dylib.lookupFunction<_SeriesC, _SeriesDart>(
+          'flutter_symengine_series',
+        );
+      } catch (_) {
+        _series = null;
+      }
+      try {
+        _linsolve = _dylib.lookupFunction<_SolveC, _SolveDart>(
+          'flutter_symengine_linsolve',
+        );
+      } catch (_) {
+        _linsolve = null;
+      }
       _substitute = _dylib.lookupFunction<_SubstituteC, _SubstituteDart>(
         'flutter_symengine_substitute',
       );
@@ -531,34 +554,34 @@ class SymbolicMathBridge {
         _eWithPrecision = null;
       }
       try {
-        _eulerGammaWithPrecision =
-            _dylib.lookupFunction<_FactorialC, _FactorialDart>(
-          'flutter_symengine_euler_gamma_with_precision',
-        );
+        _eulerGammaWithPrecision = _dylib
+            .lookupFunction<_FactorialC, _FactorialDart>(
+              'flutter_symengine_euler_gamma_with_precision',
+            );
       } catch (_) {
         _eulerGammaWithPrecision = null;
       }
       try {
-        _sqrt2WithPrecision =
-            _dylib.lookupFunction<_FactorialC, _FactorialDart>(
-          'flutter_symengine_sqrt2_with_precision',
-        );
+        _sqrt2WithPrecision = _dylib
+            .lookupFunction<_FactorialC, _FactorialDart>(
+              'flutter_symengine_sqrt2_with_precision',
+            );
       } catch (_) {
         _sqrt2WithPrecision = null;
       }
       try {
-        _evalfWithPrecision =
-            _dylib.lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
-          'flutter_symengine_evalf_with_precision',
-        );
+        _evalfWithPrecision = _dylib
+            .lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
+              'flutter_symengine_evalf_with_precision',
+            );
       } catch (_) {
         _evalfWithPrecision = null;
       }
       try {
-        _cevalfWithPrecision =
-            _dylib.lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
-          'flutter_symengine_cevalf_with_precision',
-        );
+        _cevalfWithPrecision = _dylib
+            .lookupFunction<_EvalfPrecisionC, _EvalfPrecisionDart>(
+              'flutter_symengine_cevalf_with_precision',
+            );
       } catch (_) {
         _cevalfWithPrecision = null;
       }
@@ -644,23 +667,26 @@ class SymbolicMathBridge {
       _matrixFree = _dylib.lookupFunction<_MatrixFreeC, _MatrixFreeDart>(
         'flutter_symengine_matrix_free',
       );
-      _matrixSetElement =
-          _dylib.lookupFunction<_MatrixSetElementC, _MatrixSetElementDart>(
-        'flutter_symengine_matrix_set_element',
-      );
-      _matrixGetElement =
-          _dylib.lookupFunction<_MatrixGetElementC, _MatrixGetElementDart>(
-        'flutter_symengine_matrix_get_element',
-      );
-      _matrixToString =
-          _dylib.lookupFunction<_MatrixToStringC, _MatrixToStringDart>(
-        'flutter_symengine_matrix_to_string',
-      );
+      _matrixSetElement = _dylib
+          .lookupFunction<_MatrixSetElementC, _MatrixSetElementDart>(
+            'flutter_symengine_matrix_set_element',
+          );
+      _matrixGetElement = _dylib
+          .lookupFunction<_MatrixGetElementC, _MatrixGetElementDart>(
+            'flutter_symengine_matrix_get_element',
+          );
+      _matrixToString = _dylib
+          .lookupFunction<_MatrixToStringC, _MatrixToStringDart>(
+            'flutter_symengine_matrix_to_string',
+          );
       _matrixDet = _dylib.lookupFunction<_MatrixUnaryOpC, _MatrixUnaryOpDart>(
         'flutter_symengine_matrix_det',
       );
-      _matrixInv = _dylib.lookupFunction<_MatrixUnaryOpReturnsMatrixC,
-          _MatrixUnaryOpReturnsMatrixDart>('flutter_symengine_matrix_inv');
+      _matrixInv = _dylib
+          .lookupFunction<
+            _MatrixUnaryOpReturnsMatrixC,
+            _MatrixUnaryOpReturnsMatrixDart
+          >('flutter_symengine_matrix_inv');
       _matrixAdd = _dylib.lookupFunction<_MatrixBinaryOpC, _MatrixBinaryOpDart>(
         'flutter_symengine_matrix_add',
       );
@@ -856,6 +882,74 @@ class SymbolicMathBridge {
   /// True if the underlying wrapper exposes the integrate entry point.
   /// Callers can use this to switch between symbolic and numerical paths.
   bool get hasIntegrate => _symEngineAvailable && _integrate != null;
+
+  /// Taylor/Maclaurin series of [expression] in [symbol] about [point],
+  /// truncated at [order] terms (SymEngine C++ series(), FLINT-backed).
+  /// Check [hasSeries] first — older wrapper builds lack the symbol.
+  String series(
+    String expression,
+    String symbol, {
+    String point = '0',
+    int order = 6,
+  }) {
+    final fn = _series;
+    if (!_symEngineAvailable || fn == null) {
+      throw SymbolicMathNotAvailableException('SymEngine series');
+    }
+    final exprC = expression.toNativeUtf8();
+    final symC = symbol.toNativeUtf8();
+    final pointC = point.toNativeUtf8();
+    try {
+      final resultC = fn(exprC, symC, pointC, order);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException('series');
+      }
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('series', result);
+      }
+      _freeString(resultC);
+      return result;
+    } finally {
+      malloc.free(exprC);
+      malloc.free(symC);
+      malloc.free(pointC);
+    }
+  }
+
+  /// True if the underlying wrapper exposes the series entry point.
+  bool get hasSeries => _symEngineAvailable && _series != null;
+
+  /// Symbolic linear-system solve via SymEngine linsolve(). [equations]
+  /// may be "lhs = rhs" strings or expressions implicitly = 0. Returns
+  /// "[v1, v2, ...]" in [symbols] order. Throws on non-linear input or a
+  /// system without a unique solution. Check [hasLinsolve] first.
+  String linsolve(List<String> equations, List<String> symbols) {
+    final fn = _linsolve;
+    if (!_symEngineAvailable || fn == null) {
+      throw SymbolicMathNotAvailableException('SymEngine linsolve');
+    }
+    final eqC = equations.join('; ').toNativeUtf8();
+    final symC = symbols.join(', ').toNativeUtf8();
+    try {
+      final resultC = fn(eqC, symC);
+      if (resultC == nullptr) {
+        throw SymbolicMathMemoryException('linsolve');
+      }
+      final result = resultC.toDartString();
+      if (result.startsWith('Error')) {
+        throw SymbolicMathException('linsolve', result);
+      }
+      _freeString(resultC);
+      return result;
+    } finally {
+      malloc.free(eqC);
+      malloc.free(symC);
+    }
+  }
+
+  /// True if the underlying wrapper exposes the linsolve entry point.
+  bool get hasLinsolve => _symEngineAvailable && _linsolve != null;
 
   String substitute(String expression, String symbol, String value) {
     if (!_symEngineAvailable) {

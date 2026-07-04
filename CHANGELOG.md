@@ -1,3 +1,25 @@
+## 1.4.0 (2026-07-04)
+
+Taylor series + symbolic linear-system solve (native).
+
+* **`series(expression, symbol, {point, order})`** — Taylor/Maclaurin
+  expansion via SymEngine's C++ `series()` (FLINT-backed). Expansion
+  about a non-zero point is handled by the shift substitution in the
+  wrapper. New wrapper entry point `flutter_symengine_series`.
+* **`linsolve(equations, symbols)`** — symbolic linear-system solve via
+  SymEngine's C++ `linsolve()`; equations accept "lhs = rhs" or
+  expressions implicitly = 0, result is "[v1, v2, ...]" in symbol
+  order. New wrapper entry point `flutter_symengine_linsolve`.
+* **`hasSeries` / `hasLinsolve`** capability getters; the FFI lookups
+  are optional, so the Dart API degrades gracefully on older native
+  libraries.
+* Web: both gated off (`hasSeries`/`hasLinsolve` = false) until the
+  WASM build exports the new entry points.
+* Rebuilt `SymEngineFlutterWrapper.xcframework` (incremental wrapper
+  relink; iOS device/sim + macOS).
+* Note: pubspec `version:` field was lagging at 1.2.1 while the 1.3.0
+  release shipped — both catch up to 1.4.0 here.
+
 ## 1.3.0 (2026-05-31)
 
 Web support via SymEngine WASM. The bridge now provides real CAS
