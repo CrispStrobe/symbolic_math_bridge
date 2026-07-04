@@ -1,3 +1,13 @@
+## 1.4.1 (2026-07-04)
+
+* **Trig-identity simplification now actually ships.** The rewrite
+  engine (Pythagorean, double angle, power reduction, secant form)
+  had been committed to math-stack on 2026-05-31 but never compiled
+  or released — two build errors fixed (math-stack c134cdbe) and the
+  xcframework rebuilt, so `simplify(sin(x)^2 + cos(x)^2)` now returns
+  `1` on native builds.
+* Same binaries also carry the 1.4.0 series/linsolve entry points.
+
 ## 1.4.0 (2026-07-04)
 
 Taylor series + symbolic linear-system solve (native).
