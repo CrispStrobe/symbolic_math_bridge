@@ -57,6 +57,13 @@ external JSString _jsCcallIntStr(JSString fn, JSNumber a, JSString b);
 @JS('_symCcallStrInt')
 external JSString _jsCcallStrInt(JSString fn, JSString a, JSNumber b);
 
+@JS('_symCcall3StrInt')
+external JSString _jsCcall3StrInt(
+    JSString fn, JSString a, JSString b, JSString c, JSNumber n);
+
+@JS('_symHasExport')
+external JSBoolean _jsHasExport(JSString name);
+
 @JS('_symCcallVoidNum')
 external void _jsCcallVoidNum(JSString fn, JSNumber a);
 
@@ -115,6 +122,13 @@ void _injectHelpers() {
     window._symCcallStrInt = function(fn, a, b) {
       return symEngineInstance.ccall(fn, 'string', ['string','number'], [a, b]);
     };
+    window._symCcall3StrInt = function(fn, a, b, c, n) {
+      return symEngineInstance.ccall(
+        fn, 'string', ['string','string','string','number'], [a, b, c, n]);
+    };
+    window._symHasExport = function(name) {
+      return typeof symEngineInstance['_' + name] === 'function';
+    };
     window._symCcallVoidNum = function(fn, a) {
       symEngineInstance.ccall(fn, null, ['number'], [a]);
     };
@@ -169,6 +183,14 @@ String _call3(String fn, String a, String b, String c) {
   _checkError(r, fn);
   return r;
 }
+
+String _call3StrInt(String fn, String a, String b, String c, int n) {
+  final r = _jsCcall3StrInt(fn.toJS, a.toJS, b.toJS, c.toJS, n.toJS).toDart;
+  _checkError(r, fn);
+  return r;
+}
+
+bool _hasExport(String name) => _jsHasExport(name.toJS).toDart;
 
 String _callInt(String fn, int a) {
   final r = _jsCcallInt(fn.toJS, a.toJS).toDart;
@@ -374,11 +396,11 @@ class SymbolicMathBridge {
   String integrate(String expression, String symbol) =>
       _call2('flutter_symengine_integrate', expression, symbol);
 
-  // series/linsolve are not exported by the current WASM binary
-  // (wasm_exports.json predates the C2 arc). Gated off until the web
-  // build is regenerated with the new entry points.
-  bool get hasSeries => false;
-  bool get hasLinsolve => false;
+  // series/linsolve exist only in WASM binaries built with the C2-arc
+  // wasm_exports.json — probe the module so an older cached binary
+  // degrades gracefully instead of throwing from inside ccall.
+  bool get hasSeries => _hasExport('flutter_symengine_series');
+  bool get hasLinsolve => _hasExport('flutter_symengine_linsolve');
 
   String series(
     String expression,
@@ -386,11 +408,19 @@ class SymbolicMathBridge {
     String point = '0',
     int order = 6,
   }) {
-    throw SymbolicMathNotAvailableException('SymEngine series (web build)');
+    if (!hasSeries) {
+      throw SymbolicMathNotAvailableException('SymEngine series (web build)');
+    }
+    return _call3StrInt(
+        'flutter_symengine_series', expression, symbol, point, order);
   }
 
   String linsolve(List<String> equations, List<String> symbols) {
-    throw SymbolicMathNotAvailableException('SymEngine linsolve (web build)');
+    if (!hasLinsolve) {
+      throw SymbolicMathNotAvailableException('SymEngine linsolve (web build)');
+    }
+    return _call2(
+        'flutter_symengine_linsolve', equations.join('; '), symbols.join(', '));
   }
 
   String substitute(String expression, String symbol, String value) =>
@@ -515,16 +545,16 @@ class SymbolicMathBridge {
       _callInt('flutter_symengine_sqrt2_with_precision', precision);
 
   String mpfrEvalf(String expression, int precision) => _callStrInt(
-    'flutter_symengine_evalf_with_precision',
-    expression,
-    precision,
-  );
+        'flutter_symengine_evalf_with_precision',
+        expression,
+        precision,
+      );
 
   String mpfrCevalf(String expression, int precision) => _callStrInt(
-    'flutter_symengine_cevalf_with_precision',
-    expression,
-    precision,
-  );
+        'flutter_symengine_cevalf_with_precision',
+        expression,
+        precision,
+      );
 
   String mpfrBesselJ(int order, String x) =>
       _callIntStr('flutter_symengine_besselj', order, x);

@@ -1,3 +1,17 @@
+## 1.5.0 (2026-07-04)
+
+Web parity for the C2 arc.
+
+* **Web `series()` / `linsolve()` are live** when the page's WASM
+  binary exports the new entry points; `hasSeries`/`hasLinsolve` probe
+  the module (older cached binaries degrade gracefully).
+* New JS helpers: 4-arg (str,str,str,int) ccall + `_symHasExport`.
+* Consumers must ship a math-stack WASM built from the C2-arc
+  `wasm_exports.json` with `-sNO_DISABLE_EXCEPTION_CATCHING` — earlier
+  binaries abort the whole module on any internal C++ throw (SymEngine
+  series throws as part of normal operation; parse errors killed the
+  web CAS instead of erroring).
+
 ## 1.4.2 (2026-07-04)
 
 * Fix: trig power reduction fired during recursion and destroyed
