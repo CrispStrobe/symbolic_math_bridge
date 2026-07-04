@@ -1,3 +1,10 @@
+## 1.4.2 (2026-07-04)
+
+* Fix: trig power reduction fired during recursion and destroyed
+  Pythagorean pairs — simplify(sin(x)^2 + cos(x)^2) returned the
+  expanded half-angle sum instead of 1. Rule now applies only when the
+  whole expression is a bare trig square (math-stack fix + rebuild).
+
 ## 1.4.1 (2026-07-04)
 
 * **Trig-identity simplification now actually ships.** The rewrite
