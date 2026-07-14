@@ -281,4 +281,21 @@ bridge.fibonacci(10)                          // → 55
 
 ## License
 
-This plugin is released under the **MIT License**. The underlying mathematical libraries (GMP, MPFR, MPC, FLINT, SymEngine) have their own licenses (especially LGPL), which you must comply with in your application.
+The Dart, Flutter, Swift, Objective-C and C wrapper code written in this
+repository is released under the **MIT License**. This package also distributes
+prebuilt native math libraries. Those libraries are not relicensed by this
+repository:
+
+| Component | License |
+|-----------|---------|
+| SymEngine | MIT |
+| GMP | LGPL-3.0-or-later / GPL-2.0-or-later |
+| MPFR | LGPL-3.0-or-later |
+| MPC | LGPL-3.0-or-later |
+| FLINT | LGPL-2.1-or-later |
+| Bundled SymEngine header utilities | BSD-3-Clause and GNU Bison special-exception parser skeletons, where present |
+
+If you distribute an app that links the bundled LGPL libraries, you must provide
+the notices, source/build information, and rebuild or relink path those licenses
+require. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and the builder
+repo's [LGPL-COMPLIANCE.md](https://github.com/CrispStrobe/math-stack-ios-builder/blob/master/LGPL-COMPLIANCE.md).

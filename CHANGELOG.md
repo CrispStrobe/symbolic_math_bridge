@@ -239,9 +239,11 @@ iOS and macOS were already supported via the
 * Static-linking everywhere, mirroring iOS/macOS — no runtime DLL/
   .so dependency on libgcc / libstdc++ / libwinpthread / NDK
   libc++_shared. Single binary per platform.
-* MIT licensed bridge code; LGPL-3+ static dependencies (FLINT,
-  MPFR, MPC, GMP) require shipping their license texts in the
-  consuming application. CrispCalc already does this in
+* MIT licensed bridge code; bundled static native dependencies retain
+  their upstream licenses (GMP dual LGPL-3+/GPL-2+, MPFR/MPC LGPL-3+,
+  FLINT LGPL-2.1+, SymEngine MIT) and require notices plus the relevant
+  LGPL rebuild/relink compliance materials in consuming applications.
+  CrispCalc already ships license notices in
   `assets/licenses/SYMENGINE_STACK.txt`.
 
 ### Known limitations

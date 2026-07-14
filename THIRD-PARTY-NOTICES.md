@@ -1,30 +1,33 @@
 # Third-Party Notices
 
-`symbolic_math_bridge` (this plugin's own Dart/Swift/wrapper code) is
-MIT-licensed (see LICENSE). It bundles, as prebuilt XCFrameworks under
-`ios/` and `macos/`, a native mathematics stack whose components keep
-their own upstream licenses. **Several are LGPL** -- if you ship an app
-that links this plugin, you must comply with them. See
-`math-stack-ios-builder`'s `LGPL-COMPLIANCE.md`
-(https://github.com/CrispStrobe/math-stack-ios-builder) for the two
-routes (AGPL combined-work vs. dynamic relinkable frameworks). The
-prebuilt frameworks shipped here are the **static** build, which is
-appropriate for the AGPL combined-work route (Route A).
+`symbolic_math_bridge`'s own Dart, Swift, Objective-C and C wrapper code is
+MIT-licensed (see LICENSE). This package also bundles native mathematics
+libraries as prebuilt binaries under `ios/`, `macos/`, `android/`, `linux/`,
+and `windows/`. Those binaries are not MIT-licensed by this repository; each
+component keeps its upstream license.
+
+The Apple frameworks currently shipped here are the **static** build of the
+native stack. If you distribute an app that links those LGPL libraries, you must
+provide the notices, source/build information, and practical rebuild or relink
+path required by the relevant LGPL versions. See `math-stack-ios-builder`'s
+`LGPL-COMPLIANCE.md`:
+https://github.com/CrispStrobe/math-stack-ios-builder/blob/master/LGPL-COMPLIANCE.md
 
 ## Bundled native libraries
 
-| Library   | License                       | Upstream |
-|-----------|-------------------------------|----------|
-| SymEngine | MIT                           | https://github.com/symengine/symengine |
-| GMP       | LGPL-3.0-or-later / GPL-2.0+  | https://gmplib.org/ |
-| MPFR      | LGPL-3.0-or-later             | https://www.mpfr.org/ |
-| MPC       | LGPL-3.0-or-later             | https://multiprecision.org/mpc/ |
-| FLINT     | LGPL-2.1-or-later             | https://flintlib.org/ |
-| cereal    | BSD-3-Clause (bundled in SymEngine's headers) | https://github.com/USCiLab/cereal |
+| Library   | License                                      | Upstream |
+|-----------|----------------------------------------------|----------|
+| SymEngine | MIT                                          | https://github.com/symengine/symengine |
+| GMP       | LGPL-3.0-or-later / GPL-2.0-or-later         | https://gmplib.org/ |
+| MPFR      | LGPL-3.0-or-later                            | https://www.mpfr.org/ |
+| MPC       | LGPL-3.0-or-later                            | https://multiprecision.org/mpc/ |
+| FLINT     | LGPL-2.1-or-later                            | https://flintlib.org/ |
+| cereal    | BSD-3-Clause (bundled in SymEngine headers)  | https://github.com/USCiLab/cereal |
+| Bison parser skeletons in generated SymEngine parser headers | GPL text with the standard GNU Bison special exception | https://www.gnu.org/software/bison/ |
 
-The full license texts are obtainable at the upstream URLs above and from
-the FSF (for the (L)GPL ones). The SymEngine wrapper's C entry points and
-the Flutter/FFI glue are covered by this repo's MIT LICENSE.
+The full license texts are obtainable at the upstream URLs above and from the
+FSF for the LGPL/GPL-family texts. The Flutter/FFI glue and SymEngine wrapper C
+entry points written in this repository are covered by this repo's MIT LICENSE.
 
 ## Dart dependencies
 
