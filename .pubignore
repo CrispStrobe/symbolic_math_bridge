@@ -1,0 +1,8 @@
+/.dart_tool/
+/.flutter-plugins-dependencies
+/build/
+/coverage/
+/pubspec.lock
+**/pubspec.lock
+ios/Libraries/
+ios/SymEngine.xcframework/
