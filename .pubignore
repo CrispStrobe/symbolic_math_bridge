@@ -6,3 +6,4 @@
 **/pubspec.lock
 ios/Libraries/
 ios/SymEngine.xcframework/
+macos/*.xcframework
