@@ -15,16 +15,16 @@ class SymbolicMathException implements Exception {
   @override
   String toString() {
     final libPrefix = library != null ? '[$library] ' : '';
-    return 'SymbolicMathException: ${libPrefix}$operation - $message';
+    return 'SymbolicMathException: $libPrefix$operation - $message';
   }
 }
 
 class SymbolicMathParseException extends SymbolicMathException {
   SymbolicMathParseException(
-    String operation,
-    String message, [
-    String? library,
-  ]) : super(operation, message, library);
+    super.operation,
+    super.message, [
+    super.library,
+  ]);
 }
 
 class SymbolicMathMemoryException extends SymbolicMathException {

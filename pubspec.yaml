@@ -1,7 +1,8 @@
 name: symbolic_math_bridge
 description: "A Flutter plugin providing a high-performance FFI bridge to the SymEngine symbolic math stack."
 version: 1.5.0
-homepage:
+repository: https://github.com/CrispStrobe/symbolic_math_bridge
+homepage: https://github.com/CrispStrobe/symbolic_math_bridge
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

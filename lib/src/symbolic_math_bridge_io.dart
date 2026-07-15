@@ -693,7 +693,7 @@ class SymbolicMathBridge {
 
       _symEngineAvailable = true;
     } catch (e) {
-      print('SymEngine initialization failed: $e');
+      stderr.writeln('SymEngine initialization failed: $e');
     }
   }
 

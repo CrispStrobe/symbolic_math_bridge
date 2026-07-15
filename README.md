@@ -2,7 +2,7 @@
 
 [![pub package](https://img.shields.io/badge/Flutter-Plugin-blue)](https://flutter.dev/to/develop-plugins)
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20Android%20%7C%20Windows-lightgrey)](https://flutter.dev)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-MIT%20%2B%20LGPL%20native%20deps-yellow)](THIRD-PARTY-NOTICES.md)
 
 A comprehensive Flutter plugin providing unified `dart:ffi` access to a powerful mathematical computing stack. This plugin integrates **GMP, MPFR, MPC, FLINT, and SymEngine** libraries, offering both high-level symbolic computation and direct, low-level access to each library's core functions.
 
@@ -73,9 +73,7 @@ Add this to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  symbolic_math_bridge:
-    path: ../symbolic_math_bridge
-  ffi: ^2.0.1 # Required for FFI
+  symbolic_math_bridge: ^1.5.0
 ```
 
 ### Basic Usage
@@ -283,7 +281,8 @@ bridge.fibonacci(10)                          // → 55
 
 The Dart, Flutter, Swift, Objective-C and C wrapper code written in this
 repository is released under the **MIT License**. This package also distributes
-prebuilt native math libraries. Those libraries are not relicensed by this
+prebuilt native math libraries, so the complete distributed package has mixed
+license obligations. Those native libraries are not relicensed by this
 repository:
 
 | Component | License |

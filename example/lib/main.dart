@@ -36,9 +36,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Symbolic Math Bridge Example'),
-        ),
+        appBar: AppBar(title: const Text('Symbolic Math Bridge Example')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

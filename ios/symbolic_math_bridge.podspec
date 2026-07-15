@@ -1,9 +1,9 @@
 Pod::Spec.new do |s|
   s.name             = 'symbolic_math_bridge'
-  s.version          = '1.0.14'
+  s.version          = '1.5.0'
   s.summary          = 'A bridge for the complete symbolic math stack.'
   s.description      = 'This plugin provides C-wrapped access to SymEngine and math libraries. The plugin glue is MIT; bundled native libraries retain their upstream licenses. See THIRD-PARTY-NOTICES.md.'
-  s.homepage         = 'https://example.com'
+  s.homepage         = 'https://github.com/CrispStrobe/symbolic_math_bridge'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'CrispStrobe' => 'cze@mailbox.org' }
   s.source           = { :path => '.' }
