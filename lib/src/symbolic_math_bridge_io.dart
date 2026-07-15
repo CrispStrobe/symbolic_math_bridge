@@ -84,6 +84,11 @@ late final NativeFinalizer _matrixFinalizer;
 // MATRIX CLASS
 // ============================================================================
 
+/// A dense symbolic matrix backed by SymEngine.
+///
+/// Elements are symbolic expressions passed and returned as strings. The
+/// native matrix is freed when [dispose] is called (and, as a safety net,
+/// when this object is garbage-collected via a [Finalizable]).
 class SymEngineMatrix implements Finalizable {
   late final Pointer<Void> _ptr;
   final SymbolicMathBridge _bridge;
@@ -100,8 +105,10 @@ class SymEngineMatrix implements Finalizable {
     _matrixFinalizer.attach(this, _ptr, detach: this);
   }
 
-  // Add the missing getters that the main.dart expects
+  /// The number of rows in this matrix.
   int get rows => _rows;
+
+  /// The number of columns in this matrix.
   int get cols => _cols;
 
   void _checkDisposed() {
@@ -113,6 +120,8 @@ class SymEngineMatrix implements Finalizable {
     }
   }
 
+  /// Frees the native matrix. Safe to call more than once; further use of
+  /// this matrix throws a [SymbolicMathException].
   void dispose() {
     if (!_disposed) {
       _matrixFinalizer.detach(this);
@@ -121,6 +130,7 @@ class SymEngineMatrix implements Finalizable {
     }
   }
 
+  /// Sets the element at ([row], [col]) to the symbolic expression [value].
   void set(int row, int col, String value) {
     _checkDisposed();
     if (value.trim().isEmpty) {
@@ -141,6 +151,7 @@ class SymEngineMatrix implements Finalizable {
     }
   }
 
+  /// Returns the symbolic expression stored at ([row], [col]).
   String get(int row, int col) {
     _checkDisposed();
     final resultC = _bridge._matrixGetElement(_ptr, row, col);
@@ -162,6 +173,7 @@ class SymEngineMatrix implements Finalizable {
     }
   }
 
+  /// Returns the symbolic determinant of this (square) matrix.
   String getDeterminant() {
     _checkDisposed();
     final resultC = _bridge._matrixDet(_ptr);
@@ -183,6 +195,7 @@ class SymEngineMatrix implements Finalizable {
     }
   }
 
+  /// Returns a new matrix that is the symbolic inverse of this one.
   SymEngineMatrix inverse() {
     _checkDisposed();
     final resultPtr = _bridge._matrixInv(_ptr);
@@ -192,6 +205,7 @@ class SymEngineMatrix implements Finalizable {
     return SymEngineMatrix._fromPointer(resultPtr, _bridge, _rows, _cols);
   }
 
+  /// Returns the element-wise sum of this matrix and [other].
   SymEngineMatrix operator +(SymEngineMatrix other) {
     _checkDisposed();
     other._checkDisposed();
@@ -202,6 +216,7 @@ class SymEngineMatrix implements Finalizable {
     return SymEngineMatrix._fromPointer(resultPtr, _bridge, _rows, _cols);
   }
 
+  /// Returns the matrix product of this matrix and [other].
   SymEngineMatrix operator *(SymEngineMatrix other) {
     _checkDisposed();
     other._checkDisposed();
@@ -232,8 +247,19 @@ class SymEngineMatrix implements Finalizable {
 // MAIN BRIDGE CLASS
 // ============================================================================
 
+/// The symbolic-math engine: a Dart FFI bridge over SymEngine (with GMP /
+/// MPFR / MPC / FLINT).
+///
+/// A process-wide singleton — `SymbolicMathBridge()` always returns the same
+/// instance. Expressions are passed and returned as strings; methods such as
+/// [evaluate], [expand], [simplify], [factor], [solve], [differentiate] and
+/// [integrate] cover the common computer-algebra operations. Availability of
+/// the optional operations can be probed via [hasIntegrate], [hasSeries] and
+/// [hasLinsolve].
 class SymbolicMathBridge {
   static final SymbolicMathBridge _instance = SymbolicMathBridge._internal();
+
+  /// Returns the process-wide singleton bridge instance.
   factory SymbolicMathBridge() => _instance;
 
   late final DynamicLibrary _dylib;
@@ -701,6 +727,7 @@ class SymbolicMathBridge {
   // VALIDATION AND HELPER METHODS
   // ============================================================================
 
+  /// Returns whether [expression] is syntactically valid and parseable.
   bool isValidExpression(String expression) {
     if (expression.trim().isEmpty) return false;
 
@@ -788,15 +815,23 @@ class SymbolicMathBridge {
   // PUBLIC API - SYMENGINE HIGH-LEVEL OPERATIONS
   // ============================================================================
 
+  /// Numerically/symbolically evaluates [expression] and returns the result.
   String evaluate(String expression) =>
       _performStringOperation(_evaluate, expression, 'evaluate');
+
+  /// Expands products and powers in [expression] (e.g. `(x+1)^2`).
   String expand(String expression) =>
       _performStringOperation(_expand, expression, 'expand');
+
+  /// Simplifies [expression] to a canonical, reduced form.
   String simplify(String expression) =>
       _performStringOperation(_simplify, expression, 'simplify');
+
+  /// Factors [expression] into a product of terms where possible.
   String factor(String expression) =>
       _performStringOperation(_factor, expression, 'factor');
 
+  /// Solves [expression] (an equation or expression set to zero) for [symbol].
   String solve(String expression, String symbol) {
     if (!_symEngineAvailable) {
       throw SymbolicMathNotAvailableException('SymEngine');
@@ -823,6 +858,7 @@ class SymbolicMathBridge {
     }
   }
 
+  /// Differentiates [expression] with respect to [symbol].
   String differentiate(String expression, String symbol) {
     if (!_symEngineAvailable) {
       throw SymbolicMathNotAvailableException('SymEngine');
@@ -853,6 +889,7 @@ class SymbolicMathBridge {
   /// a string. Whether this actually works depends on the C wrapper build —
   /// some builds expose the symbol but return an error from SymEngine. Test
   /// with `hasIntegrate` first if you want a safe fallback.
+  /// Integrates [expression] with respect to [symbol] (indefinite integral).
   String integrate(String expression, String symbol) {
     if (!_symEngineAvailable || _integrate == null) {
       throw SymbolicMathNotAvailableException('SymEngine integrate');
@@ -878,6 +915,7 @@ class SymbolicMathBridge {
 
   /// True if the underlying wrapper exposes the integrate entry point.
   /// Callers can use this to switch between symbolic and numerical paths.
+  /// Whether the native build supports [integrate].
   bool get hasIntegrate => _symEngineAvailable && _integrate != null;
 
   /// Taylor/Maclaurin series of [expression] in [symbol] about [point],
@@ -915,6 +953,7 @@ class SymbolicMathBridge {
   }
 
   /// True if the underlying wrapper exposes the series entry point.
+  /// Whether the native build supports [series].
   bool get hasSeries => _symEngineAvailable && _series != null;
 
   /// Symbolic linear-system solve via SymEngine linsolve(). [equations]
@@ -946,8 +985,10 @@ class SymbolicMathBridge {
   }
 
   /// True if the underlying wrapper exposes the linsolve entry point.
+  /// Whether the native build supports [linsolve].
   bool get hasLinsolve => _symEngineAvailable && _linsolve != null;
 
+  /// Substitutes [symbol] with [value] throughout [expression].
   String substitute(String expression, String symbol, String value) {
     if (!_symEngineAvailable) {
       throw SymbolicMathNotAvailableException('SymEngine');
@@ -994,11 +1035,15 @@ class SymbolicMathBridge {
   }
 
   // Number theory
+  /// Returns the greatest common divisor of expressions [a] and [b].
   String gcd(String a, String b) =>
       _performBinaryStringOperation(_gcd, a, b, 'gcd');
+
+  /// Returns the least common multiple of expressions [a] and [b].
   String lcm(String a, String b) =>
       _performBinaryStringOperation(_lcm, a, b, 'lcm');
 
+  /// Returns `n!` as an exact big integer string.
   String factorial(int n) {
     if (!_symEngineAvailable) {
       throw SymbolicMathNotAvailableException('SymEngine');

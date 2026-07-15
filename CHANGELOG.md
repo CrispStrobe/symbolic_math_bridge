@@ -1,3 +1,9 @@
+## 1.5.1 (2026-07-15)
+
+Dartdoc coverage for the public API (SymbolicMathBridge / SymEngineMatrix /
+exception types), so the package documents 20%+ of its API on pub.dev. Docs
+only; no API or behaviour change.
+
 ## 1.5.0 (2026-07-04)
 
 Web parity for the C2 arc.

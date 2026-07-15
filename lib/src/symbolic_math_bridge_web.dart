@@ -220,6 +220,10 @@ void _checkError(String result, String op) {
 // Matrix (WASM-backed, uses opaque pointer-as-int handle)
 // ---------------------------------------------------------------------------
 
+/// A dense symbolic matrix backed by the SymEngine WASM build.
+///
+/// Elements are symbolic expressions passed and returned as strings; call
+/// [dispose] when finished to free the native handle.
 class SymEngineMatrix {
   final int _ptr;
   final int _rows;
@@ -228,7 +232,10 @@ class SymEngineMatrix {
 
   SymEngineMatrix._(this._ptr, this._rows, this._cols);
 
+  /// The number of rows in this matrix.
   int get rows => _rows;
+
+  /// The number of columns in this matrix.
   int get cols => _cols;
 
   void _check() {
@@ -237,6 +244,7 @@ class SymEngineMatrix {
     }
   }
 
+  /// Frees the native matrix handle. Safe to call more than once.
   void dispose() {
     if (!_disposed) {
       _jsCcallVoidNum('flutter_symengine_matrix_free'.toJS, _ptr.toJS);
@@ -244,6 +252,7 @@ class SymEngineMatrix {
     }
   }
 
+  /// Sets the element at ([row], [col]) to the symbolic expression [value].
   void set(int row, int col, String value) {
     _check();
     final result = _jsCcallNumSetElem(
@@ -260,6 +269,7 @@ class SymEngineMatrix {
     }
   }
 
+  /// Returns the symbolic expression stored at ([row], [col]).
   String get(int row, int col) {
     _check();
     final result = _jsCcallStrGetElem(_ptr.toJS, row.toJS, col.toJS);
@@ -268,6 +278,7 @@ class SymEngineMatrix {
     return s;
   }
 
+  /// Returns the symbolic determinant of this (square) matrix.
   String getDeterminant() {
     _check();
     final s = _jsCcallStrFromPtr(
@@ -278,6 +289,7 @@ class SymEngineMatrix {
     return s;
   }
 
+  /// Returns a new matrix that is the symbolic inverse of this one.
   SymEngineMatrix inverse() {
     _check();
     final p = _jsCcallPtrFromPtr(
@@ -290,6 +302,7 @@ class SymEngineMatrix {
     return SymEngineMatrix._(p, _rows, _cols);
   }
 
+  /// Returns the element-wise sum of this matrix and [other].
   SymEngineMatrix operator +(SymEngineMatrix other) {
     _check();
     other._check();
@@ -304,6 +317,7 @@ class SymEngineMatrix {
     return SymEngineMatrix._(p, _rows, _cols);
   }
 
+  /// Returns the matrix product of this matrix and [other].
   SymEngineMatrix operator *(SymEngineMatrix other) {
     _check();
     other._check();
@@ -332,6 +346,10 @@ class SymEngineMatrix {
 // Main bridge class
 // ---------------------------------------------------------------------------
 
+/// The symbolic-math engine on the web: a thin wrapper over the SymEngine
+/// WASM build. Mirrors the native (`dart:ffi`) API so the same code runs on
+/// every platform; throws [SymbolicMathNotAvailableException] if the WASM
+/// module is not loaded.
 class SymbolicMathBridge {
   static bool _wasmLoaded = false;
 
@@ -362,8 +380,10 @@ class SymbolicMathBridge {
 
   // ---------- Core symbolic operations ----------
 
+  /// Whether the build supports [integrate] (always true on the web build).
   bool get hasIntegrate => true;
 
+  /// Returns whether [expression] has balanced parentheses and is non-empty.
   bool isValidExpression(String expression) {
     if (expression.trim().isEmpty) return false;
     int parenCount = 0;
@@ -375,24 +395,31 @@ class SymbolicMathBridge {
     return parenCount == 0;
   }
 
+  /// Numerically/symbolically evaluates [expression].
   String evaluate(String expression) =>
       _call1('flutter_symengine_evaluate', expression);
 
+  /// Expands products and powers in [expression].
   String expand(String expression) =>
       _call1('flutter_symengine_expand', expression);
 
+  /// Simplifies [expression] to a reduced form.
   String simplify(String expression) =>
       _call1('flutter_symengine_simplify', expression);
 
+  /// Factors [expression] into a product of terms where possible.
   String factor(String expression) =>
       _call1('flutter_symengine_factor', expression);
 
+  /// Solves [expression] for [symbol].
   String solve(String expression, String symbol) =>
       _call2('flutter_symengine_solve', expression, symbol);
 
+  /// Differentiates [expression] with respect to [symbol].
   String differentiate(String expression, String symbol) =>
       _call2('flutter_symengine_differentiate', expression, symbol);
 
+  /// Integrates [expression] with respect to [symbol].
   String integrate(String expression, String symbol) =>
       _call2('flutter_symengine_integrate', expression, symbol);
 
