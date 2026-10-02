@@ -87,7 +87,8 @@ if(BRIDGE_BUILD_MODE STREQUAL "full-from-source")
     # is kept as defense-in-depth against aggressive --gc-sections.
     add_library(symbolic_math_bridge SHARED
         "force_link.c"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../src/flutter_symengine_wrapper.c")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../src/flutter_symengine_wrapper.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../src/flutter_symengine_cas.cpp")
 
     # add_library() already yields libsymbolic_math_bridge.so on Linux
     # (CMake prepends `lib`), which is exactly the name the Dart loader
