@@ -14,7 +14,7 @@ name: Build Linux (vcpkg)
 # libgcc_s, whose versioned symbols are what the GLIBC baseline governs.
 #
 # First-run vcpkg install is ~20-40 min cold (symengine + flint + mpfr
-# + mpc + gmp, all compiled). The x-gha binary cache makes subsequent
+# + mpc + gmp, all compiled). The GitHub Actions file binary cache makes subsequent
 # runs ~5-10 min.
 
 on:
@@ -35,10 +35,10 @@ concurrency:
 
 permissions:
   contents: read
-  actions: read   # for the x-gha vcpkg binary cache
+  actions: read
 
 env:
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.cache/vcpkg,readwrite"
 
 jobs:
   build:
@@ -52,13 +52,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Export GHA cache env (for vcpkg x-gha)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
       - name: Install autotools (required by vcpkg's mpfr port)
         # vcpkg's mpfr port runs autoreconf during configure and needs
         # autoconf-archive + libtool which the runner doesn't have
@@ -68,12 +61,22 @@ jobs:
           sudo apt-get install -y autoconf autoconf-archive automake libtool
 
       - name: Use bundled vcpkg
+        id: vcpkg
         run: |
           if [ ! -x "${VCPKG_INSTALLATION_ROOT}/vcpkg" ]; then
             echo "::error::vcpkg not at \$VCPKG_INSTALLATION_ROOT — runner image changed?"
             exit 1
           fi
           echo "VCPKG_ROOT=${VCPKG_INSTALLATION_ROOT}" >> "$GITHUB_ENV"
+          echo "revision=$(git -C "$VCPKG_INSTALLATION_ROOT" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: .cache/vcpkg
+          key: linux-cas-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('linux/vcpkg.json') }}-${{ steps.vcpkg.outputs.revision }}
+          restore-keys: |
+            linux-cas-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('linux/vcpkg.json') }}-
 
       - name: Install SymEngine + deps via vcpkg manifest
         # Reads linux/vcpkg.json — symengine[flint,mpfr], no default
@@ -84,7 +87,7 @@ jobs:
           "${VCPKG_ROOT}/vcpkg" install \
             --triplet ${{ matrix.triplet }} \
             --x-manifest-root="$PWD" \
-            --binarysource="clear;x-gha,readwrite"
+            --binarysource="$VCPKG_BINARY_SOURCES"
 
       - name: Configure (CMake, standalone)
         run: |
@@ -92,6 +95,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DVCPKG_INSTALLED_DIR="$PWD/linux/vcpkg_installed" \
             -DFLUTTER_PLUGIN_STANDALONE=ON
 
       - name: Build
@@ -130,6 +134,9 @@ jobs:
           echo
           echo "--- max GLIBC version referenced (baseline check) ---"
           objdump -T "$SO" 2>/dev/null | grep -oE 'GLIBC_[0-9.]+' | sort -V -u | tail -5 || true
+
+      - name: Verify CAS capabilities in the stripped library
+        run: python3 linux/tests/test_cas.py build/libsymbolic_math_bridge.so
 
       - name: Upload plugin .so
         uses: actions/upload-artifact@v4

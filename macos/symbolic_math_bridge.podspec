@@ -40,11 +40,11 @@ Pod::Spec.new do |s|
   }
 
   s.vendored_frameworks = [
-    '../ios/GMP.xcframework',
-    '../ios/MPFR.xcframework',
-    '../ios/MPC.xcframework',
-    '../ios/FLINT.xcframework',
-    '../ios/SymEngineFlutterWrapper.xcframework',
+    'GMP.xcframework',
+    'MPFR.xcframework',
+    'MPC.xcframework',
+    'FLINT.xcframework',
+    'SymEngineFlutterWrapper.xcframework',
   ]
   # FlutterSymEngineWrapperOnly.xcframework also lives in the repo (built
   # to host the 45 C wrapper symbols in isolation, for the release-link
