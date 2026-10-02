@@ -31,6 +31,10 @@ Pod::Spec.new do |s|
     'OTHER_LDFLAGS' => [
       '-lc++',
       '-lsymengine_flutter_wrapper',
+      '-lgmp',
+      '-lmpfr',
+      '-lmpc',
+      '-lflint',
       '-all_load',
     ].join(' '),
     'LIBRARY_SEARCH_PATHS' => '$(inherited)',
